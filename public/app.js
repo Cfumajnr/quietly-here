@@ -40,7 +40,7 @@ const topicDesc = (k) => state.lang === "sw" ? TOPICS[k].descSw : TOPICS[k].desc
    Stories: a real piece of writing, but bounded so the form can't be abused. */
 const LIMITS = {
   comment: { min: 2,  max: 300 },      // ~2 to 300 words
-  story:   { min: 50, max: 2000 }      // ~50 to 2000 words
+  story:   { min: 50, max: 3000 }      // user submissions: 50 to 3000 words
 };
 const wordCount = (s) => (String(s || "").trim().match(/\S+/g) || []).length;
 
@@ -1286,8 +1286,12 @@ document.addEventListener("keydown", e => {
   }
 });
 scrollEl().addEventListener("scroll", () => {
+  const el = scrollEl();
+  // add a subtle shadow under the sticky header once the content scrolls beneath it
+  const head = el.querySelector(".topbar, .backbar, .rtop");
+  if (head) head.classList.toggle("stuck", el.scrollTop > 4);
   if (state.view !== "reader") return;
-  const el = scrollEl(); const max = el.scrollHeight - el.clientHeight;
+  const max = el.scrollHeight - el.clientHeight;
   if (max <= 0) return;
   state.progress[state.readerId] = Math.min(99, Math.round((el.scrollTop / max) * 100));
   lsSet("qh.progress", state.progress);

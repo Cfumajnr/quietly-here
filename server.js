@@ -61,7 +61,11 @@ const TOPICS = ["life", "people", "moments", "hope"];
 const badRequest = (res, msg) => res.status(400).json({ error: msg || "Bad request" });
 const wordCount = (s) => (String(s || "").trim().match(/\S+/g) || []).length;
 // keep these in sync with LIMITS in public/app.js
-const LIMITS = { comment: { min: 2, max: 300 }, story: { min: 50, max: 2000 } };
+const LIMITS = {
+  comment:    { min: 2,  max: 300 },   // everyone
+  story:      { min: 50, max: 3000 },  // user submissions
+  adminStory: { min: 1,  max: 5000 }   // admin-composed posts
+};
 
 function storyToClient(row, { includePrivate = false } = {}) {
   const out = {
@@ -128,7 +132,7 @@ app.post("/api/stories", requireUser, wrap(async (req, res) => {
   const topic = TOPICS.includes(b.topic) ? b.topic : "life";
   const lang = b.lang === "sw" ? "sw" : "en";
   const title = clean(b.title, 160);
-  const body = clean(b.body, 20000);
+  const body = clean(b.body, 24000);
   const author = clean(b.pen || b.author, 60);
   const contact = clean(b.contact, 160);
   const excerpt = clean(b.excerpt, 200) || body.slice(0, 140);
@@ -586,11 +590,13 @@ app.post("/api/admin/stories", requireAdmin, wrap(async (req, res) => {
   const topic = TOPICS.includes(b.topic) ? b.topic : "life";
   const lang = b.lang === "sw" ? "sw" : "en";
   const title = clean(b.title, 160);
-  const body = clean(b.body, 20000);
+  const body = clean(b.body, 40000);
   const author = clean(b.author || b.pen, 60);
   const pull = clean(b.pull, 200);
   const excerpt = clean(b.excerpt, 200) || body.slice(0, 140);
   if (!title || !body || !author) return badRequest(res, "Title, story and author are required.");
+  const awc = wordCount(body);
+  if (awc > LIMITS.adminStory.max) return badRequest(res, `Posts are limited to ${LIMITS.adminStory.max} words.`);
   const mins = Math.max(1, Math.round(body.split(/\s+/).length / 200));
   const info = await q.run(
     `INSERT INTO stories (topic,lang,title,pull,excerpt,body,author,tough,helpline,mins,status,created_at,published_at)
