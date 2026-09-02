@@ -1,0 +1,23 @@
+{
+  "packageId": "app.quietlyhere.twa",
+  "host": "quietly-here.onrender.com",
+  "name": "Quietly Here",
+  "launcherName": "Quietly Here",
+  "display": "standalone",
+  "orientation": "portrait",
+  "themeColor": "#155E5A",
+  "themeColorDark": "#0E423F",
+  "navigationColor": "#155E5A",
+  "navigationColorDark": "#0E423F",
+  "backgroundColor": "#F6F1E7",
+  "startUrl": "/",
+  "iconUrl": "https://quietly-here.onrender.com/icon-512.png",
+  "maskableIconUrl": "https://quietly-here.onrender.com/icon-maskable-512.png",
+  "webManifestUrl": "https://quietly-here.onrender.com/manifest.webmanifest",
+  "fallbackType": "customtabs",
+  "features": {},
+  "shortcuts": [],
+  "appVersionName": "1.0.0",
+  "appVersionCode": 1,
+  "minSdkVersion": 21
+}
