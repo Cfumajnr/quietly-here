@@ -6,8 +6,12 @@ const path = require("path");
 const crypto = require("crypto");
 const express = require("express");
 const cookieParser = require("cookie-parser");
-const { q, init, verifyPassword, now } = require("./db.js");
+const { q, init, verifyPassword, hashPassword, now } = require("./db.js");
 const rl = require("./ratelimit.js");
+const { sendConfirmation } = require("./email.js");
+
+const APP_URL = process.env.APP_URL || ""; // e.g. https://quietly-here.onrender.com (for confirm links)
+const baseUrl = (req) => APP_URL || ((req.headers["x-forwarded-proto"] || "https") + "://" + req.headers.host);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -104,7 +108,7 @@ app.get("/api/stories/:id", wrap(async (req, res) => {
   })) });
 }));
 
-app.post("/api/stories", wrap(async (req, res) => {
+app.post("/api/stories", requireUser, wrap(async (req, res) => {
   const b = req.body || {};
   const topic = TOPICS.includes(b.topic) ? b.topic : "life";
   const lang = b.lang === "sw" ? "sw" : "en";
@@ -129,9 +133,9 @@ app.post("/api/stories", wrap(async (req, res) => {
 
   const mins = Math.max(1, Math.round(body.split(/\s+/).length / 200));
   const info = await q.run(
-    `INSERT INTO stories (topic,lang,title,pull,excerpt,body,author,contact,mins,status,created_at,device_id,ip)
-     VALUES (?,?,?,?,?,?,?,?,?, 'pending', ?,?,?)`,
-    [topic, lang, title, excerpt, excerpt, body, author, contact, mins, now(), devId(req) || null, ip]
+    `INSERT INTO stories (topic,lang,title,pull,excerpt,body,author,contact,mins,status,created_at,device_id,ip,user_id)
+     VALUES (?,?,?,?,?,?,?,?,?, 'pending', ?,?,?,?)`,
+    [topic, lang, title, excerpt, excerpt, body, author, contact || req.user.email, mins, now(), devId(req) || null, ip, req.user.id]
   );
   res.json({ ok: true, id: info.lastInsertRowid, status: "pending" });
 }));
@@ -205,7 +209,7 @@ app.post("/api/comments/:id/react", wrap(async (req, res) => {
   res.json({ ok: true, ...counts, mine });
 }));
 
-app.post("/api/comments/:id/report", wrap(async (req, res) => {
+app.post("/api/comments/:id/report", requireUser, wrap(async (req, res) => {
   const c = await q.get("SELECT id FROM comments WHERE id=?", [req.params.id]);
   if (!c) return res.status(404).json({ error: "Not found" });
   const reason = clean(req.body && req.body.reason, 40) || "Other";
@@ -224,15 +228,133 @@ app.post("/api/comments/:id/report", wrap(async (req, res) => {
   )).n);
   if (cnt >= 20) return tooMany(res, 3600, "Daily report limit reached. Please try again later.");
 
-  await q.run("INSERT INTO reports (comment_id,reason,status,device_id,ip,created_at) VALUES (?,?, 'open', ?,?,?)",
-    [c.id, reason, device || null, ip, now()]);
+  await q.run("INSERT INTO reports (comment_id,reason,status,device_id,ip,created_at,user_id) VALUES (?,?, 'open', ?,?,?,?)",
+    [c.id, reason, device || null, ip, now(), req.user.id]);
   res.json({ ok: true });
+}));
+
+/* ============================================================
+   USER ACCOUNTS
+   ============================================================ */
+function newToken() { return crypto.randomBytes(24).toString("hex"); }
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/* Load the signed-in user (or null) from the qh_user cookie. */
+async function currentUser(req) {
+  const token = req.cookies && req.cookies.qh_user;
+  if (!token) return null;
+  const sess = await q.get("SELECT * FROM user_sessions WHERE token=?", [token]);
+  if (!sess) return null;
+  const u = await q.get("SELECT id,email,name,confirmed FROM users WHERE id=?", [sess.user_id]);
+  return u || null;
+}
+function userToClient(u) { return u ? { id: Number(u.id), email: u.email, name: u.name, confirmed: !!u.confirmed } : null; }
+
+/* Middleware: require a signed-in AND confirmed account.
+   Declared as a hoisted function so routes registered earlier in the file
+   (e.g. POST /api/stories) can reference it at load time. */
+function requireUser(req, res, next) {
+  return wrap(async (rq, rs, nx) => {
+    const u = await currentUser(rq);
+    if (!u) return rs.status(401).json({ error: "Please sign in to continue.", needAuth: true });
+    if (!u.confirmed) return rs.status(403).json({ error: "Please confirm your email first. Check your inbox for the link.", needConfirm: true });
+    rq.user = u;
+    nx();
+  })(req, res, next);
+}
+
+app.post("/api/auth/signup", wrap(async (req, res) => {
+  const ip = clientIp(req);
+  if (rl.isLocked("signup:" + ip, 8, 60 * 60e3)) return tooMany(res, 3600, "Too many sign-up attempts. Please try again later.");
+  const email = clean(req.body && req.body.email, 160).toLowerCase();
+  const name = clean(req.body && req.body.name, 60);
+  const password = String((req.body && req.body.password) || "");
+  if (!EMAIL_RE.test(email)) return badRequest(res, "Please enter a valid email address.");
+  if (!name) return badRequest(res, "Please enter a display name.");
+  if (password.length < 6) return badRequest(res, "Password must be at least 6 characters.");
+  rl.recordFail("signup:" + ip, 8, 60 * 60e3);
+
+  const existing = await q.get("SELECT id,confirmed FROM users WHERE email=?", [email]);
+  if (existing) {
+    // don't reveal whether an account exists — behave the same either way
+    return res.json({ ok: true, pending: true, message: "If that email is new, we've sent a confirmation link. Please check your inbox." });
+  }
+  const { hash, salt } = hashPassword(password);
+  const token = newToken();
+  await q.run(
+    "INSERT INTO users (email,name,pass_hash,pass_salt,confirmed,confirm_token,confirm_sent_at,created_at) VALUES (?,?,?,?,0,?,?,?)",
+    [email, name, hash, salt, token, now(), now()]
+  );
+  const link = baseUrl(req) + "/api/auth/confirm?token=" + token;
+  await sendConfirmation({ to: email, name, link });
+  res.json({ ok: true, pending: true, message: "Almost there! Check your inbox for a confirmation link." });
+}));
+
+app.get("/api/auth/confirm", wrap(async (req, res) => {
+  const token = String(req.query.token || "");
+  const page = (title, msg, ok) => `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>${title}</title><body style="font-family:Segoe UI,Roboto,Arial,sans-serif;background:#F6F1E7;color:#24312B;margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px">
+    <div style="max-width:400px;text-align:center;background:#FFFDF8;border:1px solid #E5DCC9;border-radius:18px;padding:34px 26px;box-shadow:0 10px 30px rgba(30,40,33,.08)">
+    <div style="font-size:40px">${ok ? "✅" : "⚠️"}</div><h1 style="font-family:Georgia,serif;font-size:22px;margin:10px 0">${title}</h1>
+    <p style="color:#4C5A53;line-height:1.6;font-size:15px">${msg}</p>
+    <a href="/" style="display:inline-block;margin-top:16px;background:#155E5A;color:#fff;text-decoration:none;font-weight:700;padding:12px 24px;border-radius:10px">Open Quietly Here</a></div></body>`;
+  if (!token) return res.status(400).send(page("Invalid link", "This confirmation link is missing its code.", false));
+  const u = await q.get("SELECT id,confirmed FROM users WHERE confirm_token=?", [token]);
+  if (!u) return res.status(400).send(page("Link expired", "This link is invalid or has already been used. Try signing in — if it doesn't work, sign up again.", false));
+  if (!u.confirmed) await q.run("UPDATE users SET confirmed=1, confirm_token=NULL WHERE id=?", [u.id]);
+  // sign them in immediately
+  const stoken = newToken();
+  await q.run("INSERT INTO user_sessions (token,user_id,created_at) VALUES (?,?,?)", [stoken, u.id, now()]);
+  res.cookie("qh_user", stoken, { httpOnly: true, sameSite: "lax", maxAge: 60 * 24 * 3600 * 1000 });
+  res.send(page("Email confirmed!", "Your account is ready. Welcome to Quietly Here — you're now signed in.", true));
+}));
+
+app.post("/api/auth/resend", wrap(async (req, res) => {
+  const email = clean(req.body && req.body.email, 160).toLowerCase();
+  const u = await q.get("SELECT * FROM users WHERE email=?", [email]);
+  if (u && !u.confirmed) {
+    const cd = rl.cooldown("resend:" + email, 60e3);
+    if (!cd.ok) return tooMany(res, cd.retryAfter, "Please wait a minute before requesting another email.");
+    let token = u.confirm_token;
+    if (!token) { token = newToken(); await q.run("UPDATE users SET confirm_token=? WHERE id=?", [token, u.id]); }
+    await q.run("UPDATE users SET confirm_sent_at=? WHERE id=?", [now(), u.id]);
+    await sendConfirmation({ to: email, name: u.name, link: baseUrl(req) + "/api/auth/confirm?token=" + token });
+  }
+  res.json({ ok: true, message: "If that account needs confirming, we've sent a fresh link." });
+}));
+
+app.post("/api/auth/login", wrap(async (req, res) => {
+  const ip = clientIp(req);
+  if (rl.isLocked("ulogin:" + ip, 10, 15 * 60e3)) return tooMany(res, 900, "Too many failed sign-in attempts. Please wait 15 minutes.");
+  const email = clean(req.body && req.body.email, 160).toLowerCase();
+  const password = String((req.body && req.body.password) || "");
+  const u = await q.get("SELECT * FROM users WHERE email=?", [email]);
+  if (!u || !verifyPassword(password, u.pass_salt, u.pass_hash)) {
+    rl.recordFail("ulogin:" + ip, 10, 15 * 60e3);
+    return res.status(401).json({ error: "Wrong email or password." });
+  }
+  rl.clearFails("ulogin:" + ip);
+  if (!u.confirmed) return res.status(403).json({ error: "Please confirm your email first — check your inbox.", needConfirm: true, email });
+  const token = newToken();
+  await q.run("INSERT INTO user_sessions (token,user_id,created_at) VALUES (?,?,?)", [token, u.id, now()]);
+  res.cookie("qh_user", token, { httpOnly: true, sameSite: "lax", maxAge: 60 * 24 * 3600 * 1000 });
+  res.json({ ok: true, user: userToClient(u) });
+}));
+
+app.post("/api/auth/logout", wrap(async (req, res) => {
+  const token = req.cookies && req.cookies.qh_user;
+  if (token) await q.run("DELETE FROM user_sessions WHERE token=?", [token]);
+  res.clearCookie("qh_user");
+  res.json({ ok: true });
+}));
+
+app.get("/api/auth/me", wrap(async (req, res) => {
+  res.json({ user: userToClient(await currentUser(req)) });
 }));
 
 /* ============================================================
    ADMIN AUTH
    ============================================================ */
-function newToken() { return crypto.randomBytes(24).toString("hex"); }
 const requireAdmin = wrap(async (req, res, next) => {
   const token = req.cookies && req.cookies.qh_admin;
   if (!token) return res.status(401).json({ error: "Not signed in" });

@@ -39,6 +39,9 @@ const topicDesc = (k) => state.lang === "sw" ? TOPICS[k].descSw : TOPICS[k].desc
 const state = {
   lang: lsGet("qh.lang", "en"),
   dark: lsGet("qh.dark", false),
+  user: null,               // {id,email,name,confirmed} once signed in
+  authMode: "in",           // 'in' | 'up' — sign-in vs create-account tab
+  authNext: null,           // action to resume after a successful sign-in
   guestName: lsGet("qh.guestName", ""),
   saved: lsGet("qh.saved", []),
   reactedComments: lsGet("qh.reactedComments", {}),  // {storyId:{commentId:type}}
@@ -86,15 +89,27 @@ const I18N = {
     subSentBody:"Thank you for trusting us with your words. Our moderator will review it — usually within a few days.",
     subStatus:"Pending review",
     authTitle:"Welcome",
-    authSub:"Accounts are for saving stories, tracking progress and submitting your writing. Reading is always free — no account needed.",
+    authSub:"Accounts are for saving stories, submitting your writing and reporting comments. Reading is always free — no account needed.",
     signIn:"Sign in", signUp:"Create account",
-    email:"Email or phone", emailPh:"you@example.com or 07…",
+    email:"Email", emailPh:"you@example.com",
     pass:"Password", passPh:"At least 6 characters",
-    name:"Display name (pen name encouraged)",
+    name:"Display name (pen name encouraged)", namePh:"e.g. Polepole",
     forgot:"Forgot password?",
     guest:"Continue as guest",
-    terms:"By continuing you agree to our Community Rules and Privacy Policy.",
+    terms:"By creating an account you agree to our Community Rules and Privacy Policy.",
     authDone:"Signed in — karibu!",
+    authWhy:"Why an account?",
+    authWhyB:"To keep this a safe, spam-free space, saving stories, submitting writing and reporting comments need a confirmed email. Reading and commenting stay open to everyone.",
+    haveAcc:"Already have an account?", noAcc:"New here?",
+    checkEmail:"Check your email",
+    checkEmailB:"We've sent a confirmation link to your inbox. Tap it to activate your account — then come back and sign in.",
+    resendEmail:"Resend the email", resent:"Sent! Check your inbox.",
+    confirmFirst:"Please confirm your email first — check your inbox for the link.",
+    signedInAs:"Signed in as", account:"Account", signInBtn:"Sign in", createBtn:"Create account",
+    gateSave:"Sign in to save stories to your library.",
+    gateSubmit:"Sign in to share your story. Accounts help us keep submissions genuine.",
+    gateReport:"Sign in to report a comment. This keeps reporting fair and spam-free.",
+    myAccount:"My account", notSignedIn:"You're reading as a guest",
     libTitle:"Library",
     guestNote:"You're reading as a guest",
     guestNoteBody:"Everything on Quietly Here is free to read without an account. Sign in to save stories, track progress and submit your writing.",
@@ -112,6 +127,17 @@ const I18N = {
     hCrisis:"If you are in crisis right now", hCrisisB:"These services are free, confidential and ready to listen. You are not a burden.",
     hReport:"Report abuse", hReportB:"Every comment has a report button. Our moderator reviews reports and blocks repeat offenders — by nickname, device and IP.",
     hContact:"Contact us", hContactB:"Reach the moderator directly — we reply within a day.",
+    ctTitle:"Contact us",
+    ctSub:"Questions, a problem to report, or just want to say hello? Reach the team directly — we read every message.",
+    ctName:"Your name (optional)", ctEmail:"Your email (optional)",
+    ctSubject:"Subject", ctSubjectPh:"What's this about?",
+    ctMsg:"Message", ctMsgPh:"Tell us what's on your mind…",
+    ctSend:"Send message",
+    ctViaEmail:"This opens your email app, ready to send to our inbox.",
+    ctReach:"Other ways to reach us",
+    ctEmailLabel:"Email", ctFollowLabel:"Facebook", ctLocationLabel:"Location",
+    ctLocationVal:"Nairobi, Kenya",
+    menuContact:"Contact us",
     back:"Back", more:"More", close:"Close",
     toastReported:"Reported — thank you. The moderator will review it.",
     toastSaved:"Saved to your library.", toastRemoved:"Removed from your library.",
@@ -176,15 +202,27 @@ const I18N = {
     subSentBody:"Asante kwa kuamini maneno yako kwetu. Msimamizi atakagua — kawaida ndani ya siku chache.",
     subStatus:"Inasubiri ukaguzi",
     authTitle:"Karibu",
-    authSub:"Akaunti ni za kuhifadhi hadithi, kufuatilia maendeleo na kutuma maandishi. Kusoma ni bure kila wakati — hakuna akaunti inayohitajika.",
+    authSub:"Akaunti ni za kuhifadhi hadithi, kutuma maandishi na kuripoti maoni. Kusoma ni bure kila wakati — hakuna akaunti inayohitajika.",
     signIn:"Ingia", signUp:"Unda akaunti",
-    email:"Barua pepe au nambari", emailPh:"you@example.com au 07…",
+    email:"Barua pepe", emailPh:"you@example.com",
     pass:"Nenosiri", passPh:"Angalau herufi 6",
-    name:"Jina linaloonekana (jina la kalamu linapendekezwa)",
+    name:"Jina linaloonekana (jina la kalamu linapendekezwa)", namePh:"mf. Polepole",
     forgot:"Umesahau nenosiri?",
     guest:"Endelea kama mgeni",
-    terms:"Kwa kuendelea unakubali Sheria za Jumuiya na Sera ya Faragha.",
+    terms:"Kwa kuunda akaunti unakubali Sheria za Jumuiya na Sera ya Faragha.",
     authDone:"Umeingia — karibu!",
+    authWhy:"Kwa nini akaunti?",
+    authWhyB:"Ili kulinda nafasi hii salama na bila spam, kuhifadhi hadithi, kutuma maandishi na kuripoti maoni kunahitaji barua pepe iliyothibitishwa. Kusoma na kutoa maoni kunabaki wazi kwa wote.",
+    haveAcc:"Tayari una akaunti?", noAcc:"Ni mgeni hapa?",
+    checkEmail:"Angalia barua pepe yako",
+    checkEmailB:"Tumetuma kiungo cha uthibitisho kwenye sanduku lako. Gusa ili kuamilisha akaunti yako — kisha rudi uingie.",
+    resendEmail:"Tuma barua pepe tena", resent:"Imetumwa! Angalia sanduku lako.",
+    confirmFirst:"Tafadhali thibitisha barua pepe yako kwanza — angalia sanduku lako.",
+    signedInAs:"Umeingia kama", account:"Akaunti", signInBtn:"Ingia", createBtn:"Unda akaunti",
+    gateSave:"Ingia ili kuhifadhi hadithi kwenye maktaba yako.",
+    gateSubmit:"Ingia ili kushiriki hadithi yako. Akaunti hutusaidia kuhakikisha uwasilishaji ni halali.",
+    gateReport:"Ingia ili kuripoti maoni. Hii huweka uripotaji wa haki na bila spam.",
+    myAccount:"Akaunti yangu", notSignedIn:"Unasoma kama mgeni",
     libTitle:"Maktaba",
     guestNote:"Unasoma kama mgeni",
     guestNoteBody:"Kila kitu kwenye Quietly Here kinasomika bila akaunti. Ingia ili kuhifadhi hadithi, kufuatilia maendeleo na kutuma maandishi.",
@@ -202,6 +240,17 @@ const I18N = {
     hCrisis:"Ikiwa uko kwenye hatari sasa hivi", hCrisisB:"Huduma hizi ni bure, za siri na ziko tayari kukusikiliza. Wewe si mzigo.",
     hReport:"Ripoti unyanyasaji", hReportB:"Kila maoni yana kitufe cha ripoti. Msimamizi anakagua ripoti na kufunga wanaokiuka — kwa jina, kifaa na IP.",
     hContact:"Wasiliana nasi", hContactB:"Mfikie msimamizi moja kwa moja — tunajibu ndani ya siku moja.",
+    ctTitle:"Wasiliana nasi",
+    ctSub:"Una swali, tatizo la kuripoti, au unataka kusalimia tu? Wasiliana na timu moja kwa moja — tunasoma kila ujumbe.",
+    ctName:"Jina lako (si lazima)", ctEmail:"Barua pepe yako (si lazima)",
+    ctSubject:"Mada", ctSubjectPh:"Ni kuhusu nini?",
+    ctMsg:"Ujumbe", ctMsgPh:"Tuambie kilichoko moyoni mwako…",
+    ctSend:"Tuma ujumbe",
+    ctViaEmail:"Hii itafungua app yako ya barua pepe, tayari kutuma kwa sanduku letu.",
+    ctReach:"Njia nyingine za kutufikia",
+    ctEmailLabel:"Barua pepe", ctFollowLabel:"Facebook", ctLocationLabel:"Mahali",
+    ctLocationVal:"Nairobi, Kenya",
+    menuContact:"Wasiliana nasi",
     back:"Rudi", more:"Zaidi", close:"Funga",
     toastReported:"Imeripotiwa — asante. Msimamizi atakagua.",
     toastSaved:"Imehifadhiwa kwenye maktaba yako.", toastRemoved:"Imeondolewa kwenye maktaba yako.",
@@ -246,6 +295,13 @@ const tt = key => {
   return (o !== undefined && o !== null) ? o : key;
 };
 const esc = s => String(s).replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+
+/* contact details — edit here to change everywhere */
+const CONTACT = {
+  email: "write@quiettruths.co.ke",
+  facebook: "",                 // full https://facebook.com/... URL, or "" to hide
+  location: "Nairobi, Kenya"
+};
 
 const HELPLINES=[
   {n:"1199", svc:"Kenya Red Cross · Mental Health (toll-free, 24/7)", tel:"1199"},
@@ -434,8 +490,8 @@ function renderSubmit() {
     <div class="field"><label>${tt("fTopic")} *</label><select id="sub-topic">${topicOpts}</select></div>
     <div class="field"><label>${tt("fLang")} *</label><select id="sub-lang"><option value="en">${tt("fLangEn")}</option><option value="sw">${tt("fLangSw")}</option></select></div>
     <div class="field"><label>${tt("fBody")} *</label><textarea id="sub-body" placeholder="${tt("fBodyPh")}"></textarea></div>
-    <div class="field"><label>${tt("fPen")} *</label><input id="sub-pen" placeholder="${tt("fPenPh")}"></div>
-    <div class="field"><label>${tt("fContact")} *</label><input id="sub-contact" placeholder="email@example.com / +254 7…"><div class="hint">${tt("fContactHint")}</div></div>
+    <div class="field"><label>${tt("fPen")} *</label><input id="sub-pen" placeholder="${tt("fPenPh")}" value="${esc((state.user&&state.user.name)||state.guestName||"")}"></div>
+    <div class="field"><label>${tt("fContact")}</label><input id="sub-contact" placeholder="email@example.com / +254 7…" value="${esc((state.user&&state.user.email)||"")}"><div class="hint">${tt("fContactHint")}</div></div>
     <div class="notebox">${tt("fAgree")}</div>
     <button class="btn primary" data-action="submit-story">✉️ ${tt("fSubmit")}</button>
   </div>`;
@@ -461,7 +517,16 @@ function renderLibrary() {
         <div class="sub" style="margin-top:6px">${pct}% ${tt("progressPct")}</div></div>`;
     }).join("") : `<div class="notebox">${tt("noProgress")}</div>`;
   } else {
-    body = `<div class="libcard">
+    const acct = state.user
+      ? `<div class="libcard">
+          <div class="setrow"><span><b>${tt("signedInAs")}</b><br><span class="muted small">${esc(state.user.name)} · ${esc(state.user.email)}</span></span>
+            <button class="pill" data-action="sign-out" style="border:1px solid var(--line)">${tt("signOut")}</button></div>
+        </div>`
+      : `<div class="libcard">
+          <div class="setrow"><span><b>${tt("notSignedIn")}</b><br><span class="muted small">${tt("authSub")}</span></span></div>
+          <button class="btn primary" data-action="goto-auth" style="width:100%;margin-top:10px">→ ${tt("signIn")} / ${tt("signUp")}</button>
+        </div>`;
+    body = acct + `<div class="libcard">
       <div class="setrow"><span>${tt("settingDark")}</span><div class="toggle ${state.dark?"on":""}" data-action="toggle-dark"><i></i></div></div>
       <div class="setrow"><span>${tt("settingLang")} — ${tt("langFull")}</span><button class="pill" data-action="toggle-lang" style="border:1px solid var(--line)">${tt("langShort")}</button></div>
       <div class="setrow"><span>${tt("deleteAcc")}</span><button class="pill" data-action="delete-data" style="color:var(--rose);border:1px solid color-mix(in srgb,var(--rose) 40%,transparent)">${tt("deleteAcc")}</button></div>
@@ -485,9 +550,70 @@ function renderHelp() {
     <div class="helpblock"><h4>📜 ${tt("hRules")}</h4><ul style="padding-left:18px">${rules}</ul></div>
     <div class="helpblock" style="border-color:var(--teal)"><h4>🆘 ${tt("hCrisis")}</h4><p style="color:var(--muted)">${tt("hCrisisB")}</p>${lines}</div>
     <div class="helpblock"><h4>⚑ ${tt("hReport")}</h4><p>${tt("hReportB")}</p></div>
-    <div class="helpblock"><h4>✉️ ${tt("hContact")}</h4><p>${tt("hContactB")}</p>
-      <div class="hline"><div><div class="num">contact@quietlyhere.app</div><div class="svc">Quietly Here</div></div></div></div>
+    <div class="helpblock" data-action="menu-nav" data-v="contact" style="cursor:pointer"><h4>✉️ ${tt("hContact")}</h4><p>${tt("hContactB")}</p>
+      <div class="hline"><div><div class="num">${esc(CONTACT.email)}</div><div class="svc">${tt("ctReach")} →</div></div></div></div>
   </div>`;
+}
+
+function renderContact() {
+  const fb = CONTACT.facebook
+    ? `<a class="hline" href="${esc(CONTACT.facebook)}" target="_blank" rel="noopener" style="text-decoration:none">
+         <div><div class="num">${esc(tt("ctFollowLabel"))}</div><div class="svc">${esc(CONTACT.facebook.replace(/^https?:\/\//,""))}</div></div>
+         <span class="call" aria-hidden="true">↗</span></a>` : "";
+  const mapQ = encodeURIComponent(CONTACT.location);
+  scrollEl().innerHTML = `<div class="view" style="padding-bottom:60px">
+    <div class="backbar"><button class="back" data-action="back">←</button><div class="backtitle">${tt("ctTitle")}</div></div>
+    <p class="muted small" style="margin:0 0 16px;line-height:1.6">${tt("ctSub")}</p>
+
+    <div class="field"><label>${tt("ctName")}</label><input id="ct-name" placeholder=""></div>
+    <div class="field"><label>${tt("ctEmail")}</label><input id="ct-email" type="email" placeholder="you@example.com"></div>
+    <div class="field"><label>${tt("ctSubject")} *</label><input id="ct-subject" placeholder="${tt("ctSubjectPh")}"></div>
+    <div class="field"><label>${tt("ctMsg")} *</label><textarea id="ct-msg" placeholder="${tt("ctMsgPh")}"></textarea></div>
+    <button class="btn primary" data-action="contact-send">✉️ ${tt("ctSend")}</button>
+    <div class="hint" style="margin-top:8px">${tt("ctViaEmail")}</div>
+
+    <div class="sec-title" style="margin-top:26px">${tt("ctReach")}</div>
+    <a class="hline" href="mailto:${esc(CONTACT.email)}" style="text-decoration:none">
+      <div><div class="num">${esc(tt("ctEmailLabel"))}</div><div class="svc">${esc(CONTACT.email)}</div></div>
+      <span class="call" aria-hidden="true">✉️</span></a>
+    ${fb}
+    <a class="hline" href="https://www.google.com/maps/search/?api=1&query=${mapQ}" target="_blank" rel="noopener" style="text-decoration:none">
+      <div><div class="num">${esc(tt("ctLocationLabel"))}</div><div class="svc">${esc(tt("ctLocationVal"))}</div></div>
+      <span class="call" aria-hidden="true">📍</span></a>
+  </div>`;
+}
+
+function renderAuth() {
+  const up = state.authMode === "up";
+  scrollEl().innerHTML = `<div class="view" style="padding-bottom:60px">
+    <div class="backbar"><button class="back" data-action="back">←</button><div class="backtitle">${up ? tt("signUp") : tt("signIn")}</div></div>
+    <div class="art typo grad-teal" style="height:120px;border-radius:16px;margin-bottom:18px"><span class="qmark">“</span><div class="bigq" style="font-size:18px">${esc(tt("authTitle"))}</div></div>
+    <p class="muted small" style="margin:0 0 16px;line-height:1.6">${tt("authSub")}</p>
+    <div class="pillgroup" style="width:100%;margin-bottom:16px">
+      <button class="pill ${!up?"on":""}" data-action="auth-tab" data-v="in" style="flex:1">${tt("signIn")}</button>
+      <button class="pill ${up?"on":""}" data-action="auth-tab" data-v="up" style="flex:1">${tt("signUp")}</button>
+    </div>
+    ${up ? `<div class="field"><label>${tt("name")} *</label><input id="au-name" placeholder="${tt("namePh")}"></div>` : ""}
+    <div class="field"><label>${tt("email")} *</label><input id="au-email" type="email" placeholder="${tt("emailPh")}" autocomplete="email"></div>
+    <div class="field"><label>${tt("pass")} *</label><input id="au-pass" type="password" placeholder="${tt("passPh")}" autocomplete="${up?"new-password":"current-password"}"></div>
+    <button class="btn primary" data-action="${up?"do-signup":"do-login"}">${up ? "✨ "+tt("createBtn") : "→ "+tt("signInBtn")}</button>
+    ${up ? `<div class="notebox" style="margin-top:12px">${tt("terms")}</div>` : ""}
+    <div style="text-align:center;margin-top:16px" class="muted small">
+      ${up ? tt("haveAcc") : tt("noAcc")}
+      <a data-action="auth-tab" data-v="${up?"in":"up"}" style="color:var(--teal);font-weight:700;cursor:pointer">${up ? tt("signIn") : tt("signUp")}</a>
+    </div>
+    <div class="helpblock" style="margin-top:22px"><h4>🔒 ${tt("authWhy")}</h4><p class="muted small" style="line-height:1.6">${tt("authWhyB")}</p></div>
+  </div>`;
+}
+
+function renderCheckEmail(email) {
+  scrollEl().innerHTML = `<div class="view" style="padding-bottom:60px">
+    <div class="backbar"><button class="back" data-action="back">←</button><div class="backtitle">${tt("checkEmail")}</div></div>
+    <div class="success"><div class="big">📬</div><h3>${tt("checkEmail")}</h3>
+      <p class="muted small" style="line-height:1.7;max-width:300px;margin:0 auto 18px">${tt("checkEmailB")}</p>
+      <div style="margin-top:6px"><button class="btn ghost" data-action="resend-confirm" data-email="${esc(email||"")}">↻ ${tt("resendEmail")}</button></div>
+      <div style="margin-top:14px"><button class="btn primary" data-action="goto-signin">→ ${tt("signIn")}</button></div>
+    </div></div>`;
 }
 
 function renderError(e) {
@@ -526,6 +652,7 @@ function renderDrawer() {
       <div class="dsec">${tt("yourspace")}</div>
       <div class="ditem" data-action="menu-nav" data-v="library"><span class="ic">📚</span>${tt("menuLibrary")}</div>
       <div class="ditem" data-action="menu-nav" data-v="help"><span class="ic">🆘</span>${tt("menuHelp")}</div>
+      <div class="ditem" data-action="menu-nav" data-v="contact"><span class="ic">✉️</span>${tt("menuContact")}</div>
       <div class="dfoot"><div class="dtoggles">
         <button class="pill" data-action="toggle-lang">🌐 ${tt("langFull")}</button>
         <button class="pill" data-action="toggle-dark">${state.dark?"☀️":"🌙"} ${tt("dark")}</button>
@@ -538,7 +665,16 @@ function closeDrawer() { const d = $("#drawer"); d.classList.remove("open"); set
 /* ============================================================
    NAVIGATION + a11y
    ============================================================ */
-const VIEWS = { home: renderHome, topic: renderTopic, search: renderSearch, reader: renderReader, submit: renderSubmit, library: renderLibrary, help: renderHelp };
+const VIEWS = { home: renderHome, topic: renderTopic, search: renderSearch, reader: renderReader, submit: renderSubmit, library: renderLibrary, help: renderHelp, contact: renderContact, auth: renderAuth };
+
+/* Gate: run `action` if signed in + confirmed, else send to sign-in with a resume hint. */
+function requireAuth(gateMsg, action) {
+  if (state.user && state.user.confirmed) { action(); return; }
+  if (gateMsg) toast(gateMsg);
+  state.authNext = action;
+  state.authMode = "in";
+  go("auth");
+}
 const NAVKEYS = { home: "home", search: "search", library: "library" };
 const ROOT_VIEWS = ["home", "search", "library"];
 const navStack = [];
@@ -587,19 +723,49 @@ function paint(view) {
   document.querySelectorAll(".nitem").forEach(b => { const k = b.dataset.action.replace("nav-", ""); b.classList.toggle("on", NAVKEYS[k] === view); });
   scrollEl().scrollTop = 0;
 }
+let booted = false;
 function go(view, extra) {
   if (state.view) { navStack.push(snapshot()); if (navStack.length > 50) navStack.shift(); }
   if (ROOT_VIEWS.includes(view)) navStack.length = 0;
   if (extra) Object.assign(state, extra);
   paint(view);
+  // mirror each in-app navigation as a browser history entry, so the phone's
+  // hardware Back button walks back through the app instead of closing it
+  if (booted) { try { history.pushState({ qh: true }, ""); } catch (e) {} }
 }
 function back() {
+  // triggers the browser's history back; the popstate handler does the actual work
+  try { history.back(); } catch (e) { backNav(); }
+}
+// step one screen back within the app (no history manipulation)
+function backNav() {
   const prev = navStack.pop();
-  if (!prev) return paint("home");
+  if (!prev) { paint("home"); return; }
   Object.assign(state, prev);
   paint(prev.view);
 }
+/* Hardware / browser Back button.
+   Priority: close an open modal → close the drawer → step back one screen.
+   We re-push a state each time so there's always an entry to consume, meaning
+   the app only actually leaves (closes) when the user is on a root screen with
+   nothing open — matching normal Android app behaviour. */
+window.addEventListener("popstate", () => {
+  const m = $("#modal");
+  if (m && !m.classList.contains("hidden")) { closeModal(); history.pushState({ qh: true }, ""); return; }
+  const d = $("#drawer");
+  if (d && d.classList.contains("open")) { closeDrawer(); history.pushState({ qh: true }, ""); return; }
+  if (navStack.length) { backNav(); history.pushState({ qh: true }, ""); return; }
+  // nothing left in-app: if not on home, go home and stay; else allow exit
+  if (state.view !== "home") { paint("home"); history.pushState({ qh: true }, ""); }
+  // else: let the navigation proceed (leaves the app) — expected on home screen
+});
 function rerender() { if (VIEWS[state.view]) VIEWS[state.view](); }
+/* Re-fetch + re-render the current view (used by pull-to-refresh). Also refreshes
+   the signed-in state so account changes show up. */
+async function refreshView() {
+  try { await refreshUser(); } catch (e) {}
+  rerender();
+}
 function applyDark() { $("#screen").setAttribute("data-theme", state.dark ? "dark" : "light"); }
 
 /* ---------- toast + modal ---------- */
@@ -624,7 +790,7 @@ document.addEventListener("click", async e => {
     case "nav-search": go("search"); break;
     case "nav-library": go("library"); break;
     case "open-story": go("reader", { readerId: +el.dataset.id }); break;
-    case "open-submit": go("submit"); closeDrawer(); break;
+    case "open-submit": closeDrawer(); requireAuth(tt("gateSubmit"), () => go("submit")); break;
     case "open-drawer": openDrawer(); break;
     case "close-drawer": closeDrawer(); break;
     case "menu-nav": closeDrawer(); setTimeout(() => go(el.dataset.v), 120); break;
@@ -638,10 +804,13 @@ document.addEventListener("click", async e => {
     case "toggle-lang": state.lang = state.lang === "en" ? "sw" : "en"; lsSet("qh.lang", state.lang); rerender(); closeDrawer(); break;
     case "toggle-dark": state.dark = !state.dark; lsSet("qh.dark", state.dark); applyDark(); rerender(); break;
     case "toggle-save": {
-      const id = state.readerId;
-      if (state.saved.includes(id)) { state.saved = state.saved.filter(x => x !== id); toast(tt("toastRemoved")); }
-      else { state.saved.push(id); toast(tt("toastSaved")); }
-      lsSet("qh.saved", state.saved); renderReader(); break;
+      requireAuth(tt("gateSave"), () => {
+        const id = state.readerId;
+        if (state.saved.includes(id)) { state.saved = state.saved.filter(x => x !== id); toast(tt("toastRemoved")); }
+        else { state.saved.push(id); toast(tt("toastSaved")); }
+        lsSet("qh.saved", state.saved); renderReader();
+      });
+      break;
     }
     case "creact": {
       const cid = +el.dataset.cid, typ = el.dataset.type;
@@ -654,8 +823,10 @@ document.addEventListener("click", async e => {
     }
     case "report": {
       const cid = +el.dataset.cid;
-      const reasons = [1,2,3,4,5].map(i => `<button class="abtn" style="margin:0 0 8px;width:100%" data-action="report-send" data-r="${tt("reportReason"+i)}" data-cid="${cid}">${tt("reportReason"+i)}</button>`).join("");
-      openModal(`<h3>${tt("reportPh")}</h3>${reasons}`);
+      requireAuth(tt("gateReport"), () => {
+        const reasons = [1,2,3,4,5].map(i => `<button class="abtn" style="margin:0 0 8px;width:100%" data-action="report-send" data-r="${tt("reportReason"+i)}" data-cid="${cid}">${tt("reportReason"+i)}</button>`).join("");
+        openModal(`<h3>${tt("reportPh")}</h3>${reasons}`);
+      });
       break;
     }
     case "report-send": {
@@ -685,7 +856,7 @@ document.addEventListener("click", async e => {
       const g = id => ($("#" + id) || {}).value || "";
       const title = g("sub-title"), body = g("sub-body"), pen = g("sub-pen"), contact = g("sub-contact");
       const topic = g("sub-topic") || "life", lang = g("sub-lang") || "en";
-      if (!title || !body || !pen || !contact) { toast("✋"); break; }
+      if (!title || !body || !pen) { toast("✋"); break; }
       try {
         await api.post("/api/stories", { title, body, pen, contact, topic, lang, deviceId: deviceId() });
         toast(tt("toastSent"));
@@ -698,6 +869,56 @@ document.addEventListener("click", async e => {
       } catch (err) { toast("⚠️ " + err.message); }
       break;
     }
+    case "contact-send": {
+      const g = id => (($("#" + id) || {}).value || "").trim();
+      const name = g("ct-name"), from = g("ct-email"), subject = g("ct-subject"), msg = g("ct-msg");
+      if (!subject || !msg) { toast("✋"); break; }
+      const bodyLines = [msg, "", "—", name ? "From: " + name : "", from ? "Reply to: " + from : ""].filter(Boolean);
+      const href = "mailto:" + CONTACT.email +
+        "?subject=" + encodeURIComponent("[Quietly Here] " + subject) +
+        "&body=" + encodeURIComponent(bodyLines.join("\n"));
+      window.location.href = href;
+      toast(tt("toastSent"));
+      break;
+    }
+    case "auth-tab": state.authMode = el.dataset.v; renderAuth(); break;
+    case "goto-signin": state.authMode = "in"; go("auth"); break;
+    case "do-signup": {
+      const g = id => (($("#" + id) || {}).value || "").trim();
+      const name = g("au-name"), email = g("au-email"), pass = ($("#au-pass")||{}).value || "";
+      if (!name || !email || !pass) { toast("✋"); break; }
+      try {
+        const r = await api.post("/api/auth/signup", { name, email, password: pass });
+        renderCheckEmail(email);
+      } catch (err) { toast("⚠️ " + err.message); }
+      break;
+    }
+    case "do-login": {
+      const email = (($("#au-email")||{}).value || "").trim(), pass = ($("#au-pass")||{}).value || "";
+      if (!email || !pass) { toast("✋"); break; }
+      try {
+        const r = await api.post("/api/auth/login", { email, password: pass });
+        state.user = r.user;
+        toast(tt("authDone"));
+        resumeAfterAuth();
+      } catch (err) {
+        if (err.needConfirm) { renderCheckEmail(email); }
+        else toast("⚠️ " + err.message);
+      }
+      break;
+    }
+    case "resend-confirm": {
+      try { await api.post("/api/auth/resend", { email: el.dataset.email }); toast(tt("resent")); }
+      catch (err) { toast("⚠️ " + err.message); }
+      break;
+    }
+    case "sign-out": {
+      try { await api.post("/api/auth/logout", {}); } catch (e) {}
+      state.user = null;
+      // saved list is device-local; keep it but it will re-gate on next save
+      toast(tt("toastSignOut")); renderLibrary(); break;
+    }
+    case "goto-auth": state.authMode = "in"; go("auth"); break;
     case "use-recent": state.searchQ = el.dataset.q; renderSearch(); break;
     case "delete-data":
       state.saved = []; state.reactedComments = {}; state.progress = {}; state.guestName = "";
@@ -705,6 +926,20 @@ document.addEventListener("click", async e => {
       toast(tt("toastDelete")); go("library"); break;
   }
 });
+
+/* After a successful sign-in, resume the pending gated action (or go home). */
+function resumeAfterAuth() {
+  const next = state.authNext;
+  state.authNext = null;
+  // drop the auth screen from the back stack so Back doesn't return to it
+  if (state.view === "auth") { const p = navStack.pop(); if (p && p.view !== "auth") { Object.assign(state, p); } }
+  if (typeof next === "function") { next(); }
+  else { paint(state.view === "auth" ? "home" : state.view); }
+}
+
+async function refreshUser() {
+  try { const r = await api.get("/api/auth/me"); state.user = r.user; } catch (e) { state.user = null; }
+}
 
 async function postComment(name, text) {
   try {
@@ -741,6 +976,96 @@ scrollEl().addEventListener("scroll", () => {
 }, { passive: true });
 document.addEventListener("click", e => { if (e.target.id === "modal") closeModal(); });
 
+/* ============================================================
+   PULL-TO-REFRESH
+   Native-app feel: pull the scroll area down from the top past a
+   threshold, release, and the current view re-fetches. A spinner
+   indicator follows the pull. Only arms when already scrolled to the top,
+   so it never fights normal scrolling. Disabled while a modal/drawer is open.
+   ============================================================ */
+(function setupPullToRefresh() {
+  const el = scrollEl();
+  if (!el) return;
+  // indicator element (styled inline so it works inside the sandboxed preview too)
+  const ind = document.createElement("div");
+  ind.id = "ptr";
+  ind.setAttribute("aria-hidden", "true");
+  ind.innerHTML = `<div class="ptr-spin"></div>`;
+  Object.assign(ind.style, {
+    position: "absolute", top: "0", left: "50%", transform: "translate(-50%,-46px)",
+    width: "34px", height: "34px", borderRadius: "50%",
+    background: "var(--surface,#FFFDF8)", boxShadow: "0 4px 14px rgba(30,40,33,.18)",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    zIndex: "40", opacity: "0", transition: "opacity .15s", pointerEvents: "none"
+  });
+  // spinner style (injected once)
+  const st = document.createElement("style");
+  st.textContent = `
+    #ptr .ptr-spin{width:18px;height:18px;border-radius:50%;border:2.5px solid var(--line,#E5DCC9);border-top-color:var(--teal,#155E5A);transition:transform .1s linear}
+    #ptr.spinning .ptr-spin{animation:ptrspin .7s linear infinite}
+    @keyframes ptrspin{to{transform:rotate(360deg)}}`;
+  document.head.appendChild(st);
+  const screen = document.getElementById("screen");
+  (screen || el.parentNode).appendChild(ind);
+
+  const THRESHOLD = 70;   // px pull needed to trigger
+  const MAX = 110;        // px cap on how far the indicator travels
+  let startY = 0, pulling = false, dist = 0, refreshing = false;
+
+  const overlayOpen = () => {
+    const m = $("#modal"), d = $("#drawer");
+    return (m && !m.classList.contains("hidden")) || (d && d.classList.contains("open"));
+  };
+
+  el.addEventListener("touchstart", (e) => {
+    if (refreshing || overlayOpen()) return;
+    if (el.scrollTop > 0) { pulling = false; return; }
+    startY = e.touches[0].clientY; pulling = true; dist = 0;
+  }, { passive: true });
+
+  el.addEventListener("touchmove", (e) => {
+    if (!pulling || refreshing) return;
+    dist = e.touches[0].clientY - startY;
+    if (dist <= 0) { pulling = false; ind.style.opacity = "0"; ind.style.transform = "translate(-50%,-46px)"; return; }
+    // resistance curve so it feels rubbery
+    const pull = Math.min(MAX, dist * 0.5);
+    ind.style.transition = "none";
+    ind.style.opacity = String(Math.min(1, pull / THRESHOLD));
+    ind.style.transform = `translate(-50%,${pull - 46}px)`;
+    ind.querySelector(".ptr-spin").style.transform = `rotate(${pull * 3}deg)`;
+  }, { passive: true });
+
+  el.addEventListener("touchend", async () => {
+    if (!pulling || refreshing) { pulling = false; return; }
+    pulling = false;
+    const pull = Math.min(MAX, dist * 0.5);
+    ind.style.transition = "transform .2s, opacity .2s";
+    if (pull >= THRESHOLD) {
+      refreshing = true;
+      ind.classList.add("spinning");
+      ind.style.transform = "translate(-50%,14px)";
+      ind.style.opacity = "1";
+      try { await refreshView(); } catch (e) {}
+      // brief pause so the spin is perceptible, then retract
+      setTimeout(() => {
+        ind.classList.remove("spinning");
+        ind.style.transform = "translate(-50%,-46px)";
+        ind.style.opacity = "0";
+        refreshing = false;
+      }, 350);
+    } else {
+      ind.style.transform = "translate(-50%,-46px)";
+      ind.style.opacity = "0";
+    }
+  });
+})();
+
 /* ---------- boot ---------- */
 applyDark();
+// seed two history entries: the first is the "exit" backstop, the second is what
+// the app consumes on Back. This lets the hardware Back button navigate in-app.
+try { history.replaceState({ qh: "root" }, ""); history.pushState({ qh: true }, ""); } catch (e) {}
+booted = true;
 go("home");
+// load any existing session, then refresh the current view so account UI shows
+refreshUser().then(() => { if (state.user) rerender(); });

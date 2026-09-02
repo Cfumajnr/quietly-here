@@ -67,6 +67,8 @@ async function migrate() {
   await ensure("comments", "ip", "TEXT");
   await ensure("reports", "device_id", "TEXT");
   await ensure("reports", "ip", "TEXT");
+  await ensure("stories", "user_id", "INTEGER");
+  await ensure("reports", "user_id", "INTEGER");
 }
 
 /* ---------- schema ---------- */
@@ -94,7 +96,14 @@ const SCHEMA = [
   id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL, pass_hash TEXT NOT NULL,
   pass_salt TEXT NOT NULL, created_at TEXT NOT NULL )`,
 `CREATE TABLE IF NOT EXISTS sessions (
-  token TEXT PRIMARY KEY, admin_id INTEGER NOT NULL, created_at TEXT NOT NULL )`
+  token TEXT PRIMARY KEY, admin_id INTEGER NOT NULL, created_at TEXT NOT NULL )`,
+`CREATE TABLE IF NOT EXISTS users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE NOT NULL, name TEXT NOT NULL,
+  pass_hash TEXT NOT NULL, pass_salt TEXT NOT NULL,
+  confirmed INTEGER NOT NULL DEFAULT 0, confirm_token TEXT, confirm_sent_at TEXT,
+  created_at TEXT NOT NULL )`,
+`CREATE TABLE IF NOT EXISTS user_sessions (
+  token TEXT PRIMARY KEY, user_id INTEGER NOT NULL, created_at TEXT NOT NULL )`
 ];
 
 /* ---------- seed + init ---------- */
@@ -131,4 +140,4 @@ async function init() {
   }
 }
 
-module.exports = { q, init, hashPassword, verifyPassword, now };
+module.exports = { q, init, hashPassword, verifyPassword, now, client };
