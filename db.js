@@ -47,6 +47,28 @@ function verifyPassword(password, salt, expected) {
 
 const now = () => new Date().toISOString();
 
+/* ---------- migrations: add columns to tables that predate them ----------
+   CREATE TABLE IF NOT EXISTS won't alter an existing table, so older
+   databases (e.g. an earlier deploy) may be missing device_id / ip columns.
+   ADD COLUMN is idempotent here because we check the existing columns first. */
+async function migrate() {
+  const cols = async (table) =>
+    (await q.all(`PRAGMA table_info(${table})`)).map((r) => r.name);
+  const ensure = async (table, col, type) => {
+    const existing = await cols(table);
+    if (!existing.includes(col)) {
+      await client.execute(`ALTER TABLE ${table} ADD COLUMN ${col} ${type}`);
+      console.log(`[db] migrated: added ${table}.${col}`);
+    }
+  };
+  await ensure("stories", "device_id", "TEXT");
+  await ensure("stories", "ip", "TEXT");
+  await ensure("comments", "device_id", "TEXT");
+  await ensure("comments", "ip", "TEXT");
+  await ensure("reports", "device_id", "TEXT");
+  await ensure("reports", "ip", "TEXT");
+}
+
 /* ---------- schema ---------- */
 const SCHEMA = [
 `CREATE TABLE IF NOT EXISTS stories (
@@ -78,6 +100,7 @@ const SCHEMA = [
 /* ---------- seed + init ---------- */
 async function init() {
   for (const stmt of SCHEMA) await client.execute(stmt);
+  await migrate();
 
   const adminCount = Number((await q.get("SELECT COUNT(*) n FROM admins")).n);
   if (adminCount === 0) {
