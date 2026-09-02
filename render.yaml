@@ -1,5 +1,11 @@
-# One-click deploy blueprint for Render.com
+# Deploy blueprint for Render.com (free-tier compatible)
 # In Render: New + → "Blueprint" → connect your repo → it reads this file.
+#
+# NOTE: Render's FREE tier has no persistent disk, so the SQLite database resets
+# to the seeded starter stories whenever the service restarts or wakes from sleep.
+# Fine for a quick look; for real testing where friends' submissions/comments must
+# persist, either upgrade this service to a paid plan and add a disk, or switch the
+# database to a free cloud DB (see DEPLOY.md).
 services:
   - type: web
     name: quietly-here
@@ -12,9 +18,3 @@ services:
         sync: false          # you set this in the Render dashboard
       - key: ADMIN_PASS
         sync: false          # you set this in the Render dashboard
-      - key: DATA_DIR
-        value: /var/data     # database lives on the persistent disk below
-    disk:
-      name: quietly-data
-      mountPath: /var/data   # keeps the SQLite database across restarts/deploys
-      sizeGB: 1
