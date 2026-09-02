@@ -1,0 +1,13 @@
+{
+  "name": "Quietly Here",
+  "short_name": "Quietly Here",
+  "description": "Read in silence. Speak without judgment. Real Kenyan stories in English & Kiswahili.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F6F1E7",
+  "theme_color": "#155E5A",
+  "lang": "en",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

@@ -1,0 +1,20 @@
+# One-click deploy blueprint for Render.com
+# In Render: New + → "Blueprint" → connect your repo → it reads this file.
+services:
+  - type: web
+    name: quietly-here
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: ADMIN_USER
+        sync: false          # you set this in the Render dashboard
+      - key: ADMIN_PASS
+        sync: false          # you set this in the Render dashboard
+      - key: DATA_DIR
+        value: /var/data     # database lives on the persistent disk below
+    disk:
+      name: quietly-data
+      mountPath: /var/data   # keeps the SQLite database across restarts/deploys
+      sizeGB: 1

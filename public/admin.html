@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quietly Here — Moderator</title>
+<style>
+:root{
+  --bg:#F6F1E7; --surface:#FFFDF8; --surface2:#EFE8D9; --ink:#24312B; --ink-soft:#4C5A53;
+  --muted:#7C877F; --line:#E5DCC9; --teal:#155E5A; --teal-deep:#0E423F; --teal-soft:#E0EFE9;
+  --amber:#C07A28; --amber-soft:#F6E7CE; --rose:#B4442F; --rose-soft:#F6DED8;
+  --serif:Georgia,"Times New Roman",serif; --sans:"Segoe UI",Roboto,Arial,sans-serif;
+  --shadow:0 6px 18px rgba(30,40,33,.08); --r:14px;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:var(--sans);background:var(--bg);color:var(--ink)}
+a{color:var(--teal)}
+:focus-visible{outline:3px solid var(--teal);outline-offset:2px;border-radius:6px}
+/* ---- login ---- */
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;
+  background:radial-gradient(1200px 700px at 20% -10%,#14332F 0%,#0C221F 55%,#081714 100%)}
+.login{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:30px;width:100%;max-width:380px;box-shadow:0 30px 80px rgba(0,0,0,.4)}
+.login .brand{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+.login .mark{width:46px;height:46px;border-radius:14px;background:linear-gradient(140deg,var(--teal),var(--teal-deep));color:#F6F1E7;display:flex;align-items:center;justify-content:center;font-size:24px}
+.login h1{font-family:var(--serif);font-size:22px;margin:0}
+.login .sub{color:var(--muted);font-size:13px;margin:2px 0 20px}
+label{display:block;font-size:12px;font-weight:700;color:var(--ink-soft);margin:0 0 5px}
+input,select,textarea{width:100%;border:1.5px solid var(--line);background:var(--surface);border-radius:10px;padding:10px 12px;font-size:14px;color:var(--ink);font-family:var(--sans)}
+input:focus,textarea:focus,select:focus{outline:none;border-color:var(--teal)}
+.field{margin-bottom:14px}
+.btn{border:none;border-radius:10px;padding:11px 16px;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--sans)}
+.btn.primary{background:var(--teal);color:#fff}
+.btn.ghost{background:transparent;border:1.5px solid var(--line);color:var(--ink-soft)}
+.btn.danger{background:var(--rose);color:#fff}
+.btn.sm{padding:6px 11px;font-size:12.5px;border-radius:8px}
+.err{color:var(--rose);font-size:13px;margin-top:8px;min-height:18px}
+/* ---- app shell ---- */
+.hidden{display:none!important}
+.top{display:flex;align-items:center;gap:14px;padding:14px 22px;background:var(--teal-deep);color:#F6F1E7}
+.top .mark{width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;font-size:18px}
+.top h1{font-family:var(--serif);font-size:18px;margin:0;flex:1}
+.top .who{font-size:13px;opacity:.85}
+.wrap{max-width:1100px;margin:0 auto;padding:22px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:22px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;box-shadow:var(--shadow)}
+.stat b{display:block;font-size:26px;font-family:var(--serif);color:var(--teal)}
+.stat span{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px}
+.tab{background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:8px 14px;font-size:13.5px;font-weight:600;color:var(--ink-soft);cursor:pointer}
+.tab.on{background:var(--teal);color:#fff;border-color:var(--teal)}
+.tab .badge{background:var(--rose);color:#fff;border-radius:20px;padding:0 7px;font-size:11px;margin-left:6px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;margin-bottom:14px;box-shadow:var(--shadow)}
+.card .cat{font-size:11px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--teal)}
+.card h3{font-family:var(--serif);margin:5px 0;font-size:19px}
+.card .meta{font-size:12.5px;color:var(--muted);margin-bottom:8px;display:flex;gap:8px 14px;flex-wrap:wrap}
+.card .body{font-size:14px;line-height:1.6;color:var(--ink-soft);white-space:pre-wrap;max-height:150px;overflow:hidden;position:relative;border-left:3px solid var(--line);padding-left:12px;margin:8px 0}
+.card .body.open{max-height:none}
+.card .contact{font-size:12.5px;background:var(--amber-soft);color:#7a4d12;border-radius:8px;padding:6px 10px;display:inline-block;margin-bottom:10px}
+.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.spacer{flex:1}
+.check{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--ink-soft);background:var(--surface2);padding:7px 11px;border-radius:9px;cursor:pointer;user-select:none}
+.check input{width:auto}
+.pill{font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;display:inline-block}
+.pill.pending{background:var(--amber-soft);color:var(--amber)}
+.pill.published{background:var(--teal-soft);color:var(--teal)}
+.pill.rejected{background:var(--rose-soft);color:var(--rose)}
+.empty{text-align:center;color:var(--muted);padding:50px 0}
+.comment{border:1px solid var(--line);border-radius:10px;padding:11px 13px;margin-bottom:10px;background:var(--surface)}
+.comment.hidden-c{opacity:.55}
+.comment .cn{font-weight:700;font-size:13.5px}
+.comment .ct{font-size:11px;color:var(--muted)}
+.comment .cx{font-size:14px;color:var(--ink-soft);margin:5px 0 8px;line-height:1.5}
+.reason{font-size:12px;font-weight:700;color:var(--rose);background:var(--rose-soft);border-radius:8px;padding:3px 9px;display:inline-block;margin-bottom:6px}
+.muted{color:var(--muted);font-size:12.5px}
+.toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);background:var(--teal-deep);color:#F6F1E7;padding:11px 20px;border-radius:12px;font-size:14px;font-weight:600;box-shadow:0 12px 30px rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:all .25s;z-index:100}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login" class="login-wrap">
+  <form class="login" id="loginForm">
+    <div class="brand"><div class="mark">🤫</div><div><h1>Quietly Here</h1></div></div>
+    <div class="sub">Moderator sign in</div>
+    <div class="field"><label>Username</label><input id="u" autocomplete="username" value=""></div>
+    <div class="field"><label>Password</label><input id="p" type="password" autocomplete="current-password"></div>
+    <button class="btn primary" style="width:100%" type="submit">Sign in</button>
+    <div class="err" id="loginErr"></div>
+  </form>
+</div>
+
+<!-- APP -->
+<div id="app" class="hidden">
+  <div class="top">
+    <div class="mark">🤫</div><h1>Quietly Here — Moderation</h1>
+    <span class="who" id="who"></span>
+    <button class="btn ghost sm" id="logout" style="color:#F6F1E7;border-color:rgba(255,255,255,.3)">Sign out</button>
+  </div>
+  <div class="wrap">
+    <div class="stats" id="stats"></div>
+    <div class="tabs" id="tabs"></div>
+    <div id="panel"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const esc = s => String(s==null?"":s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+const api = {
+  async get(u){ const r=await fetch(u); if(r.status===401) throw {unauth:true}; if(!r.ok) throw new Error((await r.json().catch(()=>({}))).error||r.statusText); return r.json(); },
+  async post(u,b){ const r=await fetch(u,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b||{})}); if(r.status===401) throw {unauth:true}; const j=await r.json().catch(()=>({})); if(!r.ok) throw new Error(j.error||r.statusText); return j; },
+  async del(u){ const r=await fetch(u,{method:"DELETE"}); if(r.status===401) throw {unauth:true}; const j=await r.json().catch(()=>({})); if(!r.ok) throw new Error(j.error||r.statusText); return j; }
+};
+const $ = s => document.querySelector(s);
+let toastTimer;
+function toast(m){ const t=$("#toast"); t.textContent=m; t.classList.add("show"); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove("show"),2500); }
+
+const TOPICS = { life:"Life", people:"People", moments:"Moments", hope:"Hope" };
+let state = { tab:"pending", stats:{} };
+
+/* ---------- auth ---------- */
+async function checkAuth(){
+  try { const me = await api.get("/api/admin/me"); showApp(me.username); }
+  catch(e){ showLogin(); }
+}
+function showLogin(){ $("#login").classList.remove("hidden"); $("#app").classList.add("hidden"); setTimeout(()=>$("#u").focus(),50); }
+function showApp(username){ $("#login").classList.add("hidden"); $("#app").classList.remove("hidden"); $("#who").textContent="Signed in as "+username; refreshAll(); }
+
+$("#loginForm").addEventListener("submit", async e=>{
+  e.preventDefault(); $("#loginErr").textContent="";
+  try { const r = await api.post("/api/admin/login",{username:$("#u").value.trim(),password:$("#p").value}); showApp(r.username); }
+  catch(err){ $("#loginErr").textContent = err.message || "Sign in failed."; }
+});
+$("#logout").addEventListener("click", async ()=>{ await api.post("/api/admin/logout"); showLogin(); });
+
+/* ---------- data + render ---------- */
+async function refreshAll(){ await loadStats(); await renderTab(); }
+async function loadStats(){
+  try {
+    const s = await api.get("/api/admin/stats"); state.stats = s;
+    $("#stats").innerHTML = [
+      ["pending","Pending"],["published","Published"],["openReports","Open reports"],
+      ["comments","Comments"],["blocks","Blocked"],["totalReads","Total reads"]
+    ].map(([k,l])=>`<div class="stat"><b>${(s[k]||0).toLocaleString()}</b><span>${l}</span></div>`).join("");
+    renderTabs();
+  } catch(e){ if(e.unauth) showLogin(); }
+}
+function renderTabs(){
+  const s = state.stats;
+  const tabs = [
+    ["pending","📥 Queue", s.pending],
+    ["published","📚 Published", 0],
+    ["reports","🚩 Reports", s.openReports],
+    ["blocks","⛔ Blocked", 0],
+    ["rejected","🗑 Rejected", 0]
+  ];
+  $("#tabs").innerHTML = tabs.map(([k,l,badge])=>`<button class="tab ${state.tab===k?"on":""}" data-tab="${k}">${l}${badge?`<span class="badge">${badge}</span>`:""}</button>`).join("");
+  $("#tabs").querySelectorAll(".tab").forEach(b=>b.onclick=()=>{ state.tab=b.dataset.tab; renderTabs(); renderTab(); });
+}
+
+async function renderTab(){
+  const p = $("#panel"); p.innerHTML = `<div class="empty">Loading…</div>`;
+  try {
+    if(state.tab==="pending") return renderStories("pending");
+    if(state.tab==="published") return renderStories("published");
+    if(state.tab==="rejected") return renderStories("rejected");
+    if(state.tab==="reports") return renderReports();
+    if(state.tab==="blocks") return renderBlocks();
+  } catch(e){ if(e.unauth) return showLogin(); p.innerHTML=`<div class="empty">⚠️ ${esc(e.message)}</div>`; }
+}
+
+async function renderStories(status){
+  const list = await api.get("/api/admin/stories?status="+status);
+  const p = $("#panel");
+  if(!list.length){ p.innerHTML = `<div class="empty">Nothing here.</div>`; return; }
+  p.innerHTML = list.map(s=>storyCard(s,status)).join("");
+  bindStoryCards();
+}
+function storyCard(s,status){
+  const isPending = status==="pending";
+  const body = esc(s.body.join("\n\n"));
+  return `<div class="card" data-id="${s.id}">
+    <div class="row"><span class="cat">${esc(TOPICS[s.topic]||s.topic)} · ${s.lang.toUpperCase()}</span><span class="spacer"></span><span class="pill ${s.status}">${s.status}</span></div>
+    <h3>${esc(s.title)}</h3>
+    <div class="meta"><span>✍️ ${esc(s.author)}</span><span>🕐 ${esc(s.date||s.created_at.slice(0,10))}</span><span>⏱ ${s.mins} min</span>${status==="published"?`<span>👁 ${(s.reads||0).toLocaleString()} reads</span>`:""}</div>
+    ${s.contact?`<div class="contact">📬 ${esc(s.contact)}</div>`:""}
+    <div class="body" data-body>${body}</div>
+    <button class="btn ghost sm" data-expand>Read full ▾</button>
+    ${s.reject_note?`<div class="muted" style="margin-top:8px">Note: ${esc(s.reject_note)}</div>`:""}
+    <div class="row" style="margin-top:12px">
+      ${isPending?`
+        <label class="check"><input type="checkbox" data-tough> Mark tough content</label>
+        <label class="check"><input type="checkbox" data-help> Show helplines</label>
+        <span class="spacer"></span>
+        <button class="btn primary sm" data-approve>✓ Approve & publish</button>
+        <button class="btn ghost sm" data-reject>✕ Reject</button>
+      `:``}
+      ${status==="published"?`
+        <label class="check"><input type="checkbox" data-toughtoggle ${s.tough?"checked":""}> Tough content</label>
+        <span class="spacer"></span>
+        <button class="btn ghost sm" data-comments>💬 Comments</button>
+        <button class="btn danger sm" data-delete>Delete</button>
+      `:``}
+      ${status==="rejected"?`<span class="spacer"></span><button class="btn ghost sm" data-approve>Re-approve</button><button class="btn danger sm" data-delete>Delete</button>`:``}
+    </div>
+    <div data-commentbox></div>
+  </div>`;
+}
+function bindStoryCards(){
+  $("#panel").querySelectorAll(".card").forEach(card=>{
+    const id = card.dataset.id;
+    const q = sel => card.querySelector(sel);
+    const exp = q("[data-expand]"); if(exp) exp.onclick=()=>{ q("[data-body]").classList.toggle("open"); exp.textContent = q("[data-body]").classList.contains("open")?"Show less ▴":"Read full ▾"; };
+    const ap = q("[data-approve]"); if(ap) ap.onclick=async()=>{ await api.post(`/api/admin/stories/${id}/approve`,{tough:q("[data-tough]")?.checked, helpline:q("[data-help]")?.checked}); toast("Published ✓"); refreshAll(); };
+    const rj = q("[data-reject]"); if(rj) rj.onclick=async()=>{ const note=prompt("Reason (optional, not shown publicly):")||""; await api.post(`/api/admin/stories/${id}/reject`,{note}); toast("Rejected"); refreshAll(); };
+    const del = q("[data-delete]"); if(del) del.onclick=async()=>{ if(confirm("Delete this story permanently?")){ await api.del(`/api/admin/stories/${id}`); toast("Deleted"); refreshAll(); } };
+    const tt = q("[data-toughtoggle]"); if(tt) tt.onchange=async()=>{ await api.post(`/api/admin/stories/${id}/tough`,{tough:tt.checked}); toast("Updated"); };
+    const cm = q("[data-comments]"); if(cm) cm.onclick=()=>toggleComments(id, q("[data-commentbox]"));
+  });
+}
+
+async function toggleComments(storyId, box){
+  if(box.dataset.open){ box.innerHTML=""; delete box.dataset.open; return; }
+  box.dataset.open="1";
+  box.innerHTML = `<div class="muted" style="margin-top:12px">Loading comments…</div>`;
+  const list = await api.get("/api/admin/comments?story_id="+storyId);
+  if(!list.length){ box.innerHTML=`<div class="muted" style="margin-top:12px">No comments.</div>`; return; }
+  box.innerHTML = `<div style="margin-top:14px">`+list.map(c=>commentRow(c)).join("")+`</div>`;
+  bindComments(box);
+}
+function commentRow(c){
+  return `<div class="comment ${c.hidden?"hidden-c":""}" data-cid="${c.id}">
+    <div class="row"><span class="cn">${esc(c.name)}</span><span class="ct">${esc(c.created_at.slice(0,16).replace("T"," "))}</span>
+      <span class="spacer"></span><span class="muted">👍${c.likes} ❤️${c.loves} 🤗${c.cares}</span></div>
+    <div class="cx">${esc(c.text)}</div>
+    <div class="row">
+      <button class="btn ghost sm" data-hide>${c.hidden?"Unhide":"Hide"}</button>
+      <button class="btn ghost sm" data-block>Block "${esc(c.name)}"</button>
+      <button class="btn danger sm" data-del>Delete</button>
+    </div></div>`;
+}
+function bindComments(root){
+  root.querySelectorAll(".comment").forEach(el=>{
+    const cid = el.dataset.cid, name = el.querySelector(".cn").textContent;
+    el.querySelector("[data-hide]").onclick=async e=>{ const hide=!el.classList.contains("hidden-c"); await api.post(`/api/admin/comments/${cid}/hide`,{hidden:hide}); toast(hide?"Hidden":"Unhidden"); el.classList.toggle("hidden-c",hide); e.target.textContent=hide?"Unhide":"Hide"; };
+    el.querySelector("[data-block]").onclick=async()=>{ if(confirm(`Block "${name}" from commenting?`)){ await api.post("/api/admin/block",{name}); toast("Blocked "+name); loadStats(); } };
+    el.querySelector("[data-del]").onclick=async()=>{ if(confirm("Delete this comment?")){ await api.del(`/api/admin/comments/${cid}`); el.remove(); toast("Deleted"); loadStats(); } };
+  });
+}
+
+async function renderReports(){
+  const list = await api.get("/api/admin/reports");
+  const p = $("#panel");
+  if(!list.length){ p.innerHTML=`<div class="empty">No open reports. 🎉</div>`; return; }
+  p.innerHTML = list.map(r=>`<div class="card" data-report="${r.report_id}" data-cid="${r.comment_id}">
+    <span class="reason">⚑ ${esc(r.reason)}</span>
+    <div class="muted">On story: <b>${esc(r.story_title)}</b></div>
+    <div class="comment ${r.hidden?"hidden-c":""}" style="margin-top:10px">
+      <div class="cn">${esc(r.name)}</div><div class="cx">${esc(r.text)}</div></div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn ghost sm" data-hide>${r.hidden?"Unhide comment":"Hide comment"}</button>
+      <button class="btn ghost sm" data-block>Block "${esc(r.name)}"</button>
+      <button class="btn danger sm" data-del>Delete comment</button>
+      <span class="spacer"></span>
+      <button class="btn primary sm" data-resolve>Resolve report</button>
+    </div></div>`).join("");
+  p.querySelectorAll("[data-report]").forEach(card=>{
+    const rid=card.dataset.report, cid=card.dataset.cid, name=card.querySelector(".cn").textContent;
+    card.querySelector("[data-hide]").onclick=async e=>{ const hide=!card.querySelector(".comment").classList.contains("hidden-c"); await api.post(`/api/admin/comments/${cid}/hide`,{hidden:hide}); card.querySelector(".comment").classList.toggle("hidden-c",hide); e.target.textContent=hide?"Unhide comment":"Hide comment"; toast("Updated"); };
+    card.querySelector("[data-block]").onclick=async()=>{ if(confirm(`Block "${name}"?`)){ await api.post("/api/admin/block",{name}); toast("Blocked"); loadStats(); } };
+    card.querySelector("[data-del]").onclick=async()=>{ if(confirm("Delete comment?")){ await api.del(`/api/admin/comments/${cid}`); await api.post(`/api/admin/reports/${rid}/resolve`); toast("Deleted & resolved"); refreshAll(); } };
+    card.querySelector("[data-resolve]").onclick=async()=>{ await api.post(`/api/admin/reports/${rid}/resolve`); toast("Resolved"); refreshAll(); };
+  });
+}
+
+async function renderBlocks(){
+  const list = await api.get("/api/admin/blocks");
+  const p = $("#panel");
+  const form = `<div class="card"><div class="row">
+    <input id="blkName" placeholder="Nickname to block" style="max-width:220px">
+    <input id="blkDev" placeholder="Device id (optional)" style="max-width:260px">
+    <button class="btn primary sm" id="addBlk">Add block</button></div></div>`;
+  p.innerHTML = form + (list.length ? list.map(b=>`<div class="card" data-blk="${b.id}"><div class="row">
+      <span class="pill rejected">${esc(b.kind)}</span> <b>${esc(b.value)}</b>
+      <span class="muted">· ${esc(b.created_at.slice(0,10))}</span>
+      <span class="spacer"></span><button class="btn ghost sm" data-unblock>Remove</button></div></div>`).join("")
+    : `<div class="empty">No one is blocked.</div>`);
+  $("#addBlk").onclick=async()=>{ const name=$("#blkName").value.trim(), device=$("#blkDev").value.trim(); if(!name&&!device){toast("Enter a name or device");return;} await api.post("/api/admin/block",{name,device}); toast("Blocked"); renderTab(); loadStats(); };
+  p.querySelectorAll("[data-blk]").forEach(c=>c.querySelector("[data-unblock]").onclick=async()=>{ await api.del("/api/admin/blocks/"+c.dataset.blk); toast("Removed"); renderTab(); loadStats(); });
+}
+
+checkAuth();
+</script>
+</body>
+</html>

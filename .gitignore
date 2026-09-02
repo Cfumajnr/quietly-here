@@ -1,0 +1,16 @@
+# dependencies
+node_modules/
+
+# the live database (never commit real user data)
+data/
+*.db
+*.db-wal
+*.db-shm
+
+# env secrets
+.env
+
+# OS / editor noise
+.DS_Store
+*.log
+npm-debug.log*
