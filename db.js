@@ -54,14 +54,17 @@ const SCHEMA = [
   title TEXT NOT NULL, title_alt TEXT, pull TEXT, excerpt TEXT, body TEXT NOT NULL,
   author TEXT NOT NULL, contact TEXT, tough INTEGER NOT NULL DEFAULT 0, helpline INTEGER NOT NULL DEFAULT 0,
   mins INTEGER NOT NULL DEFAULT 3, reads INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'pending',
-  reject_note TEXT, created_at TEXT NOT NULL, published_at TEXT )`,
+  reject_note TEXT, created_at TEXT NOT NULL, published_at TEXT, device_id TEXT, ip TEXT )`,
 `CREATE TABLE IF NOT EXISTS comments (
   id INTEGER PRIMARY KEY AUTOINCREMENT, story_id INTEGER NOT NULL, name TEXT NOT NULL, text TEXT NOT NULL,
   likes INTEGER NOT NULL DEFAULT 0, loves INTEGER NOT NULL DEFAULT 0, cares INTEGER NOT NULL DEFAULT 0,
-  hidden INTEGER NOT NULL DEFAULT 0, device_id TEXT, created_at TEXT NOT NULL )`,
+  hidden INTEGER NOT NULL DEFAULT 0, device_id TEXT, ip TEXT, created_at TEXT NOT NULL )`,
 `CREATE TABLE IF NOT EXISTS reports (
   id INTEGER PRIMARY KEY AUTOINCREMENT, comment_id INTEGER NOT NULL, reason TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'open', created_at TEXT NOT NULL )`,
+  status TEXT NOT NULL DEFAULT 'open', device_id TEXT, ip TEXT, created_at TEXT NOT NULL )`,
+`CREATE TABLE IF NOT EXISTS reactions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, comment_id INTEGER NOT NULL, device_id TEXT NOT NULL,
+  type TEXT NOT NULL, created_at TEXT NOT NULL, UNIQUE(comment_id, device_id) )`,
 `CREATE TABLE IF NOT EXISTS blocks (
   id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT NOT NULL, value TEXT NOT NULL, created_at TEXT NOT NULL,
   UNIQUE(kind, value) )`,

@@ -83,6 +83,27 @@ URL — people open it in a phone browser and tap "Add to Home Screen".
 When you're ready for the Play Store later, this same app can be wrapped with **Bubblewrap /
 TWA** (a thin native shell around the web app) with almost no code changes.
 
+## Abuse protection / rate limits
+
+Enforced server-side (per device id + IP), so they can't be bypassed from the browser:
+
+| Action | Limit |
+|---|---|
+| Story submissions | 5 per day, min 60s apart |
+| Comments | 20 per hour, min 10s apart |
+| Reports | 20 per day, and only **once per comment** per device |
+| Reactions | exactly **one per comment** per device (tap again to remove, or switch type) |
+| Admin login | locks for 15 min after 10 failed attempts from an IP |
+| Any API endpoint | 120 requests/minute per IP (burst guard) |
+
+Reaction counts are computed from a `reactions` table (one row per device+comment), not
+trusted from the client — so they can't be inflated by repeat taps or scripts. Hourly/daily
+quotas are checked against the database, so they survive restarts; the short cooldowns and
+the login lock are in-memory (see `ratelimit.js`).
+
+There is no public sign-up to limit: reading and commenting are anonymous (nickname only),
+and the sole account is the moderator, which the login lock protects.
+
 ## Notes / next steps for production
 
 - Add HTTPS (the hosts above give it automatically).

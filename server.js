@@ -7,12 +7,31 @@ const crypto = require("crypto");
 const express = require("express");
 const cookieParser = require("cookie-parser");
 const { q, init, verifyPassword, now } = require("./db.js");
+const rl = require("./ratelimit.js");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+app.set("trust proxy", 1); // Render sits behind a proxy; needed for real client IPs
 app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
+
+/* ---------- rate-limit helpers ---------- */
+const clientIp = (req) => (req.headers["x-forwarded-for"] || "").split(",")[0].trim() || req.ip || "unknown";
+const devId = (req) => String((req.body && req.body.deviceId) || req.headers["x-device-id"] || "").slice(0, 80);
+// identity used for quotas: prefer device id, always also gate by IP
+const who = (req) => devId(req) || clientIp(req);
+const tooMany = (res, retryAfter, msg) => {
+  if (retryAfter) res.set("Retry-After", String(retryAfter));
+  return res.status(429).json({ error: msg || "Too many requests. Please slow down.", retryAfter });
+};
+
+/* Global API burst limiter: 120 requests / minute / IP (skips static + reads are cheap). */
+app.use("/api", (req, res, next) => {
+  const r = rl.windowLimit("burst:" + clientIp(req), 120, 60e3);
+  if (!r.ok) return tooMany(res, r.retryAfter);
+  next();
+});
 
 /* wrap async route handlers/middleware so errors return JSON instead of crashing */
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch((e) => {
@@ -67,7 +86,22 @@ app.get("/api/stories/:id", wrap(async (req, res) => {
   const comments = await q.all(
     "SELECT id,name,text,likes,loves,cares,created_at FROM comments WHERE story_id=? AND hidden=0 ORDER BY created_at ASC", [row.id]
   );
-  res.json({ story: storyToClient(row), comments: comments.map(c => ({ ...c, id: Number(c.id), likes: Number(c.likes), loves: Number(c.loves), cares: Number(c.cares) })) });
+  // include this device's own reaction per comment, so the UI can highlight it
+  const device = devId(req);
+  let mineByComment = {};
+  if (device && comments.length) {
+    const ids = comments.map(c => Number(c.id));
+    const placeholders = ids.map(() => "?").join(",");
+    const mine = await q.all(
+      `SELECT comment_id, type FROM reactions WHERE device_id=? AND comment_id IN (${placeholders})`,
+      [device, ...ids]
+    );
+    for (const m of mine) mineByComment[Number(m.comment_id)] = m.type;
+  }
+  res.json({ story: storyToClient(row), comments: comments.map(c => ({
+    ...c, id: Number(c.id), likes: Number(c.likes), loves: Number(c.loves), cares: Number(c.cares),
+    mine: mineByComment[Number(c.id)] || null
+  })) });
 }));
 
 app.post("/api/stories", wrap(async (req, res) => {
@@ -80,11 +114,24 @@ app.post("/api/stories", wrap(async (req, res) => {
   const contact = clean(b.contact, 160);
   const excerpt = clean(b.excerpt, 200) || body.slice(0, 140);
   if (!title || !body || !author) return badRequest(res, "Title, story and pen name are required.");
+
+  const id = who(req), ip = clientIp(req);
+  // min 60s between submissions
+  const cd = rl.cooldown("sub:cd:" + id, 60e3);
+  if (!cd.ok) return tooMany(res, cd.retryAfter, "Please wait a moment before submitting another story.");
+  // max 5 submissions per rolling 24h — checked against the database (survives restarts)
+  const dayAgo = new Date(Date.now() - 24 * 3600e3).toISOString();
+  const cnt = Number((await q.get(
+    "SELECT COUNT(*) n FROM stories WHERE created_at > ? AND (device_id = ? OR ip = ?)",
+    [dayAgo, devId(req) || "\u0000", ip]
+  )).n);
+  if (cnt >= 5) return tooMany(res, 3600, "Daily submission limit reached (5 per day). Please try again tomorrow.");
+
   const mins = Math.max(1, Math.round(body.split(/\s+/).length / 200));
   const info = await q.run(
-    `INSERT INTO stories (topic,lang,title,pull,excerpt,body,author,contact,mins,status,created_at)
-     VALUES (?,?,?,?,?,?,?,?,?, 'pending', ?)`,
-    [topic, lang, title, excerpt, excerpt, body, author, contact, mins, now()]
+    `INSERT INTO stories (topic,lang,title,pull,excerpt,body,author,contact,mins,status,created_at,device_id,ip)
+     VALUES (?,?,?,?,?,?,?,?,?, 'pending', ?,?,?)`,
+    [topic, lang, title, excerpt, excerpt, body, author, contact, mins, now(), devId(req) || null, ip]
   );
   res.json({ ok: true, id: info.lastInsertRowid, status: "pending" });
 }));
@@ -99,28 +146,86 @@ app.post("/api/stories/:id/comments", wrap(async (req, res) => {
   const blockedName = await q.get("SELECT 1 FROM blocks WHERE kind='name' AND value=?", [name.toLowerCase()]);
   const blockedDev = deviceId ? await q.get("SELECT 1 FROM blocks WHERE kind='device' AND value=?", [deviceId]) : null;
   if (blockedName || blockedDev) return res.status(403).json({ error: "This account is blocked." });
-  const info = await q.run("INSERT INTO comments (story_id,name,text,device_id,created_at) VALUES (?,?,?,?,?)",
-    [story.id, name, text, deviceId || null, now()]);
+
+  const id = who(req), ip = clientIp(req);
+  // min 10s between comments
+  const cd = rl.cooldown("com:cd:" + id, 10e3);
+  if (!cd.ok) return tooMany(res, cd.retryAfter, "You're commenting too fast. Please wait a few seconds.");
+  // max 20 comments per rolling hour (DB-backed)
+  const hourAgo = new Date(Date.now() - 3600e3).toISOString();
+  const cnt = Number((await q.get(
+    "SELECT COUNT(*) n FROM comments WHERE created_at > ? AND (device_id = ? OR ip = ?)",
+    [hourAgo, deviceId || "\u0000", ip]
+  )).n);
+  if (cnt >= 20) return tooMany(res, 1800, "Hourly comment limit reached (20 per hour). Please try again later.");
+
+  const info = await q.run("INSERT INTO comments (story_id,name,text,device_id,ip,created_at) VALUES (?,?,?,?,?,?)",
+    [story.id, name, text, deviceId || null, ip, now()]);
   const c = await q.get("SELECT id,name,text,likes,loves,cares,created_at FROM comments WHERE id=?", [info.lastInsertRowid]);
   res.json({ ok: true, comment: { ...c, id: Number(c.id), likes: Number(c.likes), loves: Number(c.loves), cares: Number(c.cares) } });
 }));
 
+/* One reaction per device per comment, enforced server-side via the reactions table.
+   Body: { type:'like'|'love'|'care', deviceId }. Re-sending the same type removes it
+   (toggle off); sending a different type switches it. Counts are derived, not trusted. */
+const REACT_COL = { like: "likes", love: "loves", care: "cares" };
 app.post("/api/comments/:id/react", wrap(async (req, res) => {
-  const type = ({ like: "likes", love: "loves", care: "cares" })[req.body && req.body.type];
-  if (!type) return badRequest(res, "Bad reaction type.");
-  const dir = (req.body && req.body.dir) === "down" ? -1 : 1;
-  const c = await q.get("SELECT * FROM comments WHERE id=? AND hidden=0", [req.params.id]);
+  const type = req.body && req.body.type;
+  if (!REACT_COL[type]) return badRequest(res, "Bad reaction type.");
+  const device = devId(req);
+  if (!device) return badRequest(res, "Missing device id.");
+
+  const c = await q.get("SELECT id FROM comments WHERE id=? AND hidden=0", [req.params.id]);
   if (!c) return res.status(404).json({ error: "Not found" });
-  const next = Math.max(0, Number(c[type]) + dir);
-  await q.run(`UPDATE comments SET ${type}=? WHERE id=?`, [next, c.id]);
-  res.json({ ok: true, likes: type === "likes" ? next : Number(c.likes), loves: type === "loves" ? next : Number(c.loves), cares: type === "cares" ? next : Number(c.cares) });
+
+  // light burst guard on reactions (per device+comment): blocks machine-gun clicks
+  // but comfortably allows a human toggling/switching their choice
+  const cd = rl.cooldown("react:cd:" + device + ":" + req.params.id, 300);
+  if (!cd.ok) return tooMany(res, cd.retryAfter);
+
+  const existing = await q.get("SELECT type FROM reactions WHERE comment_id=? AND device_id=?", [c.id, device]);
+  let mine = null;
+  if (!existing) {
+    await q.run("INSERT INTO reactions (comment_id,device_id,type,created_at) VALUES (?,?,?,?)", [c.id, device, type, now()]);
+    mine = type;
+  } else if (existing.type === type) {
+    await q.run("DELETE FROM reactions WHERE comment_id=? AND device_id=?", [c.id, device]); // toggle off
+    mine = null;
+  } else {
+    await q.run("UPDATE reactions SET type=?, created_at=? WHERE comment_id=? AND device_id=?", [type, now(), c.id, device]); // switch
+    mine = type;
+  }
+
+  // recompute authoritative counts from the reactions table, and cache onto the comment row
+  const counts = { likes: 0, loves: 0, cares: 0 };
+  for (const r of await q.all("SELECT type, COUNT(*) n FROM reactions WHERE comment_id=? GROUP BY type", [c.id])) {
+    if (REACT_COL[r.type]) counts[REACT_COL[r.type]] = Number(r.n);
+  }
+  await q.run("UPDATE comments SET likes=?, loves=?, cares=? WHERE id=?", [counts.likes, counts.loves, counts.cares, c.id]);
+  res.json({ ok: true, ...counts, mine });
 }));
 
 app.post("/api/comments/:id/report", wrap(async (req, res) => {
   const c = await q.get("SELECT id FROM comments WHERE id=?", [req.params.id]);
   if (!c) return res.status(404).json({ error: "Not found" });
   const reason = clean(req.body && req.body.reason, 40) || "Other";
-  await q.run("INSERT INTO reports (comment_id,reason,status,created_at) VALUES (?,?, 'open', ?)", [c.id, reason, now()]);
+  const device = devId(req), ip = clientIp(req);
+
+  // one report per comment per device (prevents report-spam / brigading)
+  if (device) {
+    const dup = await q.get("SELECT 1 FROM reports WHERE comment_id=? AND device_id=?", [c.id, device]);
+    if (dup) return res.status(409).json({ error: "You've already reported this comment. The moderator will review it." });
+  }
+  // max 20 reports per rolling 24h per device/ip
+  const dayAgo = new Date(Date.now() - 24 * 3600e3).toISOString();
+  const cnt = Number((await q.get(
+    "SELECT COUNT(*) n FROM reports WHERE created_at > ? AND (device_id = ? OR ip = ?)",
+    [dayAgo, device || "\u0000", ip]
+  )).n);
+  if (cnt >= 20) return tooMany(res, 3600, "Daily report limit reached. Please try again later.");
+
+  await q.run("INSERT INTO reports (comment_id,reason,status,device_id,ip,created_at) VALUES (?,?, 'open', ?,?,?)",
+    [c.id, reason, device || null, ip, now()]);
   res.json({ ok: true });
 }));
 
@@ -138,12 +243,19 @@ const requireAdmin = wrap(async (req, res, next) => {
 });
 
 app.post("/api/admin/login", wrap(async (req, res) => {
+  const ip = clientIp(req);
+  // lock after 10 failed attempts within 15 minutes
+  if (rl.isLocked("login:" + ip, 10, 15 * 60e3)) {
+    return tooMany(res, 900, "Too many failed sign-in attempts. Please wait 15 minutes.");
+  }
   const username = clean(req.body && req.body.username, 40);
   const password = String((req.body && req.body.password) || "");
   const admin = await q.get("SELECT * FROM admins WHERE username=?", [username]);
   if (!admin || !verifyPassword(password, admin.pass_salt, admin.pass_hash)) {
+    rl.recordFail("login:" + ip, 10, 15 * 60e3);
     return res.status(401).json({ error: "Wrong username or password." });
   }
+  rl.clearFails("login:" + ip);
   const token = newToken();
   await q.run("INSERT INTO sessions (token,admin_id,created_at) VALUES (?,?,?)", [token, admin.id, now()]);
   res.cookie("qh_admin", token, { httpOnly: true, sameSite: "lax", maxAge: 7 * 24 * 3600 * 1000 });
@@ -208,6 +320,12 @@ app.post("/api/admin/stories/:id/tough", requireAdmin, wrap(async (req, res) => 
 }));
 
 app.delete("/api/admin/stories/:id", requireAdmin, wrap(async (req, res) => {
+  const cids = (await q.all("SELECT id FROM comments WHERE story_id=?", [req.params.id])).map(r => Number(r.id));
+  for (const cid of cids) {
+    await q.run("DELETE FROM reactions WHERE comment_id=?", [cid]);
+    await q.run("DELETE FROM reports WHERE comment_id=?", [cid]);
+  }
+  await q.run("DELETE FROM comments WHERE story_id=?", [req.params.id]);
   const info = await q.run("DELETE FROM stories WHERE id=?", [req.params.id]);
   res.json({ ok: info.changes > 0 });
 }));
@@ -237,6 +355,8 @@ app.post("/api/admin/comments/:id/hide", requireAdmin, wrap(async (req, res) => 
 }));
 
 app.delete("/api/admin/comments/:id", requireAdmin, wrap(async (req, res) => {
+  await q.run("DELETE FROM reactions WHERE comment_id=?", [req.params.id]);
+  await q.run("DELETE FROM reports WHERE comment_id=?", [req.params.id]);
   const info = await q.run("DELETE FROM comments WHERE id=?", [req.params.id]);
   res.json({ ok: info.changes > 0 });
 }));

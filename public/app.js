@@ -380,11 +380,9 @@ async function renderReader() {
   const s = data.story; state.reader = data;
   const langBadge = s.lang === "sw" ? "SW" : "EN";
   const saved = state.saved.includes(s.id);
-  const myReacts = state.reactedComments[s.id] || {};
-
   const commentHTML = data.comments.map((c) => {
     const reacts = [["like"],["love"],["care"]].map(([k]) => {
-      const on = myReacts[c.id] === k;
+      const on = c.mine === k;   // server tells us this device's reaction
       const count = c[k + "s"] || 0;
       const label = tt("react" + k[0].toUpperCase() + k.slice(1));
       return `<button class="cr ${on?"on":""}" type="button" data-action="creact" data-cid="${c.id}" data-type="${k}" aria-pressed="${on}" aria-label="${label} (${count})"><span class="e" aria-hidden="true">${REACT_SVG[k]}</span>${count}</button>`;
@@ -646,17 +644,10 @@ document.addEventListener("click", async e => {
       lsSet("qh.saved", state.saved); renderReader(); break;
     }
     case "creact": {
-      const cid = +el.dataset.cid, typ = el.dataset.type, sid = state.readerId;
-      state.reactedComments[sid] = state.reactedComments[sid] || {};
-      const cur = state.reactedComments[sid][cid];
+      const cid = +el.dataset.cid, typ = el.dataset.type;
       try {
-        if (cur === typ) { await api.post(`/api/comments/${cid}/react`, { type: typ, dir: "down" }); delete state.reactedComments[sid][cid]; }
-        else {
-          if (cur) await api.post(`/api/comments/${cid}/react`, { type: cur, dir: "down" });
-          await api.post(`/api/comments/${cid}/react`, { type: typ, dir: "up" });
-          state.reactedComments[sid][cid] = typ;
-        }
-        lsSet("qh.reactedComments", state.reactedComments);
+        // server enforces one reaction per device per comment (toggle / switch)
+        await api.post(`/api/comments/${cid}/react`, { type: typ, deviceId: deviceId() });
         toast(tt("toastReacted")); renderReader();
       } catch (err) { toast("⚠️ " + err.message); }
       break;
@@ -668,7 +659,7 @@ document.addEventListener("click", async e => {
       break;
     }
     case "report-send": {
-      try { await api.post(`/api/comments/${+el.dataset.cid}/report`, { reason: el.dataset.r }); closeModal(); toast(tt("toastReported")); }
+      try { await api.post(`/api/comments/${+el.dataset.cid}/report`, { reason: el.dataset.r, deviceId: deviceId() }); closeModal(); toast(tt("toastReported")); }
       catch (err) { toast("⚠️ " + err.message); }
       break;
     }
@@ -696,7 +687,7 @@ document.addEventListener("click", async e => {
       const topic = g("sub-topic") || "life", lang = g("sub-lang") || "en";
       if (!title || !body || !pen || !contact) { toast("✋"); break; }
       try {
-        await api.post("/api/stories", { title, body, pen, contact, topic, lang });
+        await api.post("/api/stories", { title, body, pen, contact, topic, lang, deviceId: deviceId() });
         toast(tt("toastSent"));
         scrollEl().innerHTML = `<div class="view" style="padding-bottom:60px">
           <div class="backbar"><button class="back" data-action="back">←</button><div class="backtitle">${tt("submitTitle")}</div></div>
