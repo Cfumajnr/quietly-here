@@ -299,7 +299,7 @@ const esc = s => String(s).replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">"
 /* contact details — edit here to change everywhere */
 const CONTACT = {
   email: "write@quiettruths.co.ke",
-  facebook: "",                 // full https://facebook.com/... URL, or "" to hide
+  facebook: "https://www.facebook.com/NobodySaysThis",
   location: "Nairobi, Kenya"
 };
 
