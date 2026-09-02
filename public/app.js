@@ -49,7 +49,7 @@ const state = {
   recents: lsGet("qh.recents", []),
   view: "home", readerId: null, topic: null,
   searchTopic: "all", searchLang: "all", searchSort: "new", searchQ: "",
-  libTab: "saved", pendingComment: null, subFile: false,
+  libTab: "saved", pendingComment: null, subFile: false, contactDraft: null,
   // per-view data caches
   homeStories: [], topicStories: [], searchStories: [], reader: null
 };
@@ -93,7 +93,7 @@ const I18N = {
     signIn:"Sign in", signUp:"Create account",
     email:"Email", emailPh:"you@example.com",
     pass:"Password", passPh:"At least 6 characters",
-    name:"Display name (pen name encouraged)", namePh:"e.g. Polepole",
+    name:"Display name", namePh:"e.g. Mary or Mike",
     forgot:"Forgot password?",
     guest:"Continue as guest",
     terms:"By creating an account you agree to our Community Rules and Privacy Policy.",
@@ -129,7 +129,10 @@ const I18N = {
     hContact:"Contact us", hContactB:"Reach the moderator directly — we reply within a day.",
     ctTitle:"Contact us",
     ctSub:"Questions, a problem to report, or just want to say hello? Reach the team directly — we read every message.",
-    ctName:"Your name (optional)", ctEmail:"Your email (optional)",
+    ctName:"Your name", ctEmail:"Your email (optional)",
+    ctSentTitle:"Message ready to send", ctSentBody:"Your email app should have opened with your message to us. If it didn't, you can reach us any time at the address below. We read every message and reply within a day.",
+    ctOkay:"Okay", ctBackHome:"Back home",
+    needFields:"Please fill in your name, subject and message.",
     ctSubject:"Subject", ctSubjectPh:"What's this about?",
     ctMsg:"Message", ctMsgPh:"Tell us what's on your mind…",
     ctSend:"Send message",
@@ -137,7 +140,25 @@ const I18N = {
     ctReach:"Other ways to reach us",
     ctEmailLabel:"Email", ctFollowLabel:"Facebook", ctLocationLabel:"Location",
     ctLocationVal:"Nairobi, Kenya",
-    menuContact:"Contact us",
+    menuContact:"Contact us", menuAbout:"About", menuTerms:"Terms & Privacy",
+    aboutTitle:"About Quietly Here",
+    aboutLead:"Quietly Here is a home for real, honest Kenyan stories — a place to read in silence and speak without judgment.",
+    aboutWhat:"What we do", aboutWhatB:"We publish true stories about everyday Kenyan life: money, family, faith, mental health, love, loss and hope. Some are written in English, some in Kiswahili. Every story is read by a moderator before it is published.",
+    aboutWhy:"Why it matters", aboutWhyB:"Too many people carry their struggles in silence. When we read that someone else has walked a similar road, we feel less alone. That is the quiet power of a shared story.",
+    aboutSafe:"A safe space", aboutSafeB:"This is a judgment-free community. We remove bullying, hate and spam, and we point people who are hurting toward real help. You can read freely without an account; a free account lets you save stories, submit your own writing and report anything harmful.",
+    aboutTeam:"Who runs it", aboutTeamB:"Quietly Here is a small, independent project based in Nairobi, Kenya. Reach us any time through the Contact page.",
+    termsTitle:"Terms & Privacy",
+    termsUpdated:"Last updated: 2 September 2026",
+    termsIntro:"Please read these terms. By creating an account or using Quietly Here, you agree to them.",
+    t1h:"1. Using Quietly Here", t1b:"Quietly Here is a platform for reading and sharing personal stories. It is not a substitute for professional medical, legal or mental-health advice. If you are in crisis, please use the helplines on the Get Help page.",
+    t2h:"2. Your account", t2b:"You must give a valid email to create an account and confirm it before you can save stories, submit writing or report comments. Keep your password private. You are responsible for activity on your account. You must be 18 or older, or have a guardian's consent.",
+    t3h:"3. What you post", t3b:"You keep ownership of what you write. By submitting a story or comment, you give Quietly Here permission to publish, lightly edit and translate it. Do not post anything that is false, hateful, harassing, that infringes someone's rights, or that shares another person's private details without consent.",
+    t4h:"4. Moderation", t4b:"Every story is reviewed before publishing. We may edit, decline, hide or remove content, and block users — by nickname, device or IP — to keep the community safe. Reporting abuse is encouraged; misusing reports is not.",
+    t5h:"5. Privacy", t5b:"We collect only what we need: your name and email (for accounts), the content you post, and basic technical data (device identifier and IP address) used to prevent spam and abuse. We do not sell your data. Confirmation emails are sent through our email provider. You can request deletion of your data at any time via the Contact page.",
+    t6h:"6. Changes", t6b:"We may update these terms. Continued use after an update means you accept the new terms. Questions? Reach us through the Contact page.",
+    agreeTerms:"I have read and agree to the", agreeTermsLink:"Terms & Privacy",
+    mustAgree:"Please agree to the Terms & Privacy to create an account.",
+    readTerms:"Read the Terms & Privacy",
     back:"Back", more:"More", close:"Close",
     toastReported:"Reported — thank you. The moderator will review it.",
     toastSaved:"Saved to your library.", toastRemoved:"Removed from your library.",
@@ -145,7 +166,7 @@ const I18N = {
     toastSent:"Story sent for review!", toastSignOut:"Signed out. You're reading as a guest again.",
     toastDelete:"Demo: data deletion is a real feature in the app.",
     needNick:"Please choose a nickname to join the conversation (it's how we keep this space safe).",
-    nickPh:"Your nickname", nickBtn:"Start commenting",
+    nickPh:"Your name", nickBtn:"Start commenting", nickEg:"e.g. Mary or Mike",
     guestSay:"as guest", youSay:"You",
     reportC:"Report",
     reportPh:"Report this comment", reportReason1:"Bullying", reportReason2:"Spam", reportReason3:"Hate speech", reportReason4:"Self-harm risk", reportReason5:"Other",
@@ -206,7 +227,7 @@ const I18N = {
     signIn:"Ingia", signUp:"Unda akaunti",
     email:"Barua pepe", emailPh:"you@example.com",
     pass:"Nenosiri", passPh:"Angalau herufi 6",
-    name:"Jina linaloonekana (jina la kalamu linapendekezwa)", namePh:"mf. Polepole",
+    name:"Jina linaloonekana", namePh:"mf. Maria au Juma",
     forgot:"Umesahau nenosiri?",
     guest:"Endelea kama mgeni",
     terms:"Kwa kuunda akaunti unakubali Sheria za Jumuiya na Sera ya Faragha.",
@@ -242,7 +263,10 @@ const I18N = {
     hContact:"Wasiliana nasi", hContactB:"Mfikie msimamizi moja kwa moja — tunajibu ndani ya siku moja.",
     ctTitle:"Wasiliana nasi",
     ctSub:"Una swali, tatizo la kuripoti, au unataka kusalimia tu? Wasiliana na timu moja kwa moja — tunasoma kila ujumbe.",
-    ctName:"Jina lako (si lazima)", ctEmail:"Barua pepe yako (si lazima)",
+    ctName:"Jina lako", ctEmail:"Barua pepe yako (si lazima)",
+    ctSentTitle:"Ujumbe uko tayari kutumwa", ctSentBody:"App yako ya barua pepe inapaswa kuwa imefunguka na ujumbe wako kwetu. Ikiwa haikufunguka, unaweza kutufikia wakati wowote kwa anwani iliyo hapa chini. Tunasoma kila ujumbe na kujibu ndani ya siku moja.",
+    ctOkay:"Sawa", ctBackHome:"Rudi nyumbani",
+    needFields:"Tafadhali jaza jina lako, mada na ujumbe.",
     ctSubject:"Mada", ctSubjectPh:"Ni kuhusu nini?",
     ctMsg:"Ujumbe", ctMsgPh:"Tuambie kilichoko moyoni mwako…",
     ctSend:"Tuma ujumbe",
@@ -250,7 +274,25 @@ const I18N = {
     ctReach:"Njia nyingine za kutufikia",
     ctEmailLabel:"Barua pepe", ctFollowLabel:"Facebook", ctLocationLabel:"Mahali",
     ctLocationVal:"Nairobi, Kenya",
-    menuContact:"Wasiliana nasi",
+    menuContact:"Wasiliana nasi", menuAbout:"Kuhusu", menuTerms:"Masharti & Faragha",
+    aboutTitle:"Kuhusu Quietly Here",
+    aboutLead:"Quietly Here ni nyumba ya hadithi za kweli na za uaminifu za Kikenya — mahali pa kusoma kimya na kuzungumza bila hukumu.",
+    aboutWhat:"Tunachofanya", aboutWhatB:"Tunachapisha hadithi za kweli za maisha ya kila siku ya Kikenya: fedha, familia, imani, afya ya akili, upendo, hasara na matumaini. Baadhi zimeandikwa kwa Kiingereza, nyingine kwa Kiswahili. Kila hadithi husomwa na msimamizi kabla ya kuchapishwa.",
+    aboutWhy:"Kwa nini ni muhimu", aboutWhyB:"Watu wengi mno hubeba taabu zao kimya kimya. Tunaposoma kwamba mtu mwingine amepitia njia kama hiyo, tunahisi hatuko peke yetu. Hiyo ndiyo nguvu tulivu ya hadithi iliyoshirikiwa.",
+    aboutSafe:"Nafasi salama", aboutSafeB:"Hii ni jumuiya isiyo na hukumu. Tunaondoa unyanyasaji, chuki na spam, na tunawaelekeza wanaoumia kwenye msaada halisi. Unaweza kusoma bila akaunti; akaunti ya bure hukuwezesha kuhifadhi hadithi, kutuma maandishi yako na kuripoti chochote chenye madhara.",
+    aboutTeam:"Nani anayeendesha", aboutTeamB:"Quietly Here ni mradi mdogo, huru ulioko Nairobi, Kenya. Tufikie wakati wowote kupitia ukurasa wa Wasiliana.",
+    termsTitle:"Masharti & Faragha",
+    termsUpdated:"Yamesasishwa: 2 Septemba 2026",
+    termsIntro:"Tafadhali soma masharti haya. Kwa kuunda akaunti au kutumia Quietly Here, unayakubali.",
+    t1h:"1. Kutumia Quietly Here", t1b:"Quietly Here ni jukwaa la kusoma na kushiriki hadithi za binafsi. Si mbadala wa ushauri wa kitaalamu wa matibabu, kisheria au afya ya akili. Ikiwa uko kwenye hatari, tafadhali tumia nambari za msaada kwenye ukurasa wa Pata Msaada.",
+    t2h:"2. Akaunti yako", t2b:"Lazima utoe barua pepe halali kuunda akaunti na kuithibitisha kabla ya kuhifadhi hadithi, kutuma maandishi au kuripoti maoni. Weka nenosiri lako siri. Wewe ni mwajibikaji wa shughuli kwenye akaunti yako. Lazima uwe na miaka 18 au zaidi, au uwe na ruhusa ya mlezi.",
+    t3h:"3. Unachochapisha", t3b:"Unabaki na umiliki wa unachoandika. Kwa kutuma hadithi au maoni, unampa Quietly Here ruhusa ya kuchapisha, kuhariri kidogo na kutafsiri. Usichapishe chochote cha uongo, chuki, unyanyasaji, kinachokiuka haki za mtu, au kinachoshiriki maelezo binafsi ya mtu mwingine bila ridhaa.",
+    t4h:"4. Usimamizi", t4b:"Kila hadithi hukaguliwa kabla ya kuchapishwa. Tunaweza kuhariri, kukataa, kuficha au kuondoa maudhui, na kuzuia watumiaji — kwa jina, kifaa au IP — ili kulinda jumuiya. Kuripoti unyanyasaji kunahimizwa; kutumia vibaya ripoti hakukubaliki.",
+    t5h:"5. Faragha", t5b:"Tunakusanya tu tunachohitaji: jina lako na barua pepe (kwa akaunti), maudhui unayochapisha, na data ya kimsingi ya kiufundi (kitambulisho cha kifaa na anwani ya IP) inayotumika kuzuia spam na unyanyasaji. Hatuuzii data yako. Barua pepe za uthibitisho hutumwa kupitia mtoa huduma wetu wa barua pepe. Unaweza kuomba kufutwa kwa data yako wakati wowote kupitia ukurasa wa Wasiliana.",
+    t6h:"6. Mabadiliko", t6b:"Tunaweza kusasisha masharti haya. Kuendelea kutumia baada ya sasisho kunamaanisha unakubali masharti mapya. Maswali? Tufikie kupitia ukurasa wa Wasiliana.",
+    agreeTerms:"Nimesoma na ninakubali", agreeTermsLink:"Masharti & Faragha",
+    mustAgree:"Tafadhali kubali Masharti & Faragha ili kuunda akaunti.",
+    readTerms:"Soma Masharti & Faragha",
     back:"Rudi", more:"Zaidi", close:"Funga",
     toastReported:"Imeripotiwa — asante. Msimamizi atakagua.",
     toastSaved:"Imehifadhiwa kwenye maktaba yako.", toastRemoved:"Imeondolewa kwenye maktaba yako.",
@@ -258,7 +300,7 @@ const I18N = {
     toastSent:"Hadithi imetumwa kwa ukaguzi!", toastSignOut:"Umetoka. Unasoma kama mgeni tena.",
     toastDelete:"Demo: kufuta data ni kipengele halisi kwenye app.",
     needNick:"Chagua jina ili ujiunge na mazungumzo (ndivyo tunavyolinda nafasi hii).",
-    nickPh:"Jina lako", nickBtn:"Anza kutoa maoni",
+    nickPh:"Jina lako", nickBtn:"Anza kutoa maoni", nickEg:"mf. Maria au Juma",
     guestSay:"kama mgeni", youSay:"Wewe",
     reportC:"Ripoti",
     reportPh:"Ripoti maoni haya", reportReason1:"Unyanyasaji", reportReason2:"Spam", reportReason3:"Chuki", reportReason4:"Hatari ya kujidhuru", reportReason5:"Nyingine",
@@ -559,32 +601,85 @@ function renderHelp() {
   </div>`;
 }
 
+/* a styled, tappable contact row */
+function contactCard(icon, label, value, href, ext) {
+  return `<a class="contactcard" href="${esc(href)}"${ext?' target="_blank" rel="noopener"':''}>
+    <span class="cc-ico" aria-hidden="true">${icon}</span>
+    <span class="cc-tx"><b>${esc(label)}</b><span>${esc(value)}</span></span>
+    <span class="cc-go" aria-hidden="true">›</span></a>`;
+}
 function renderContact() {
-  const fb = CONTACT.facebook
-    ? `<a class="hline" href="${esc(CONTACT.facebook)}" target="_blank" rel="noopener" style="text-decoration:none">
-         <div><div class="num">${esc(tt("ctFollowLabel"))}</div><div class="svc">${esc(CONTACT.facebook.replace(/^https?:\/\//,""))}</div></div>
-         <span class="call" aria-hidden="true">↗</span></a>` : "";
+  const d = state.contactDraft || {};
   const mapQ = encodeURIComponent(CONTACT.location);
+  const fb = CONTACT.facebook
+    ? contactCard("👍", tt("ctFollowLabel"), CONTACT.facebook.replace(/^https?:\/\//,""), CONTACT.facebook, true) : "";
   scrollEl().innerHTML = `<div class="view" style="padding-bottom:60px">
     <div class="backbar"><button class="back" data-action="back">←</button><div class="backtitle">${tt("ctTitle")}</div></div>
     <p class="muted small" style="margin:0 0 16px;line-height:1.6">${tt("ctSub")}</p>
 
-    <div class="field"><label>${tt("ctName")}</label><input id="ct-name" placeholder=""></div>
-    <div class="field"><label>${tt("ctEmail")}</label><input id="ct-email" type="email" placeholder="you@example.com"></div>
-    <div class="field"><label>${tt("ctSubject")} *</label><input id="ct-subject" placeholder="${tt("ctSubjectPh")}"></div>
-    <div class="field"><label>${tt("ctMsg")} *</label><textarea id="ct-msg" placeholder="${tt("ctMsgPh")}"></textarea></div>
+    <div class="field"><label>${tt("ctName")} *</label><input id="ct-name" value="${esc(d.name||"")}" placeholder="e.g. Mary Wanjiku"></div>
+    <div class="field"><label>${tt("ctEmail")}</label><input id="ct-email" type="email" value="${esc(d.email||"")}" placeholder="you@example.com"></div>
+    <div class="field"><label>${tt("ctSubject")} *</label><input id="ct-subject" value="${esc(d.subject||"")}" placeholder="${tt("ctSubjectPh")}"></div>
+    <div class="field"><label>${tt("ctMsg")} *</label><textarea id="ct-msg" placeholder="${tt("ctMsgPh")}">${esc(d.msg||"")}</textarea></div>
     <button class="btn primary" data-action="contact-send">✉️ ${tt("ctSend")}</button>
     <div class="hint" style="margin-top:8px">${tt("ctViaEmail")}</div>
 
-    <div class="sec-title" style="margin-top:26px">${tt("ctReach")}</div>
-    <a class="hline" href="mailto:${esc(CONTACT.email)}" style="text-decoration:none">
-      <div><div class="num">${esc(tt("ctEmailLabel"))}</div><div class="svc">${esc(CONTACT.email)}</div></div>
-      <span class="call" aria-hidden="true">✉️</span></a>
-    ${fb}
-    <a class="hline" href="https://www.google.com/maps/search/?api=1&query=${mapQ}" target="_blank" rel="noopener" style="text-decoration:none">
-      <div><div class="num">${esc(tt("ctLocationLabel"))}</div><div class="svc">${esc(tt("ctLocationVal"))}</div></div>
-      <span class="call" aria-hidden="true">📍</span></a>
+    <div class="sec-title" style="margin-top:28px">${tt("ctReach")}</div>
+    <div class="contactcards">
+      ${contactCard("✉️", tt("ctEmailLabel"), CONTACT.email, "mailto:" + CONTACT.email)}
+      ${fb}
+      ${contactCard("📍", tt("ctLocationLabel"), tt("ctLocationVal"), "https://www.google.com/maps/search/?api=1&query=" + mapQ, true)}
+    </div>
   </div>`;
+}
+
+function renderAbout() {
+  const sec = (h, b) => `<h3 class="doc-h">${tt(h)}</h3><p class="doc-p">${tt(b)}</p>`;
+  scrollEl().innerHTML = `<div class="view" style="padding-bottom:60px">
+    <div class="backbar"><button class="back" data-action="back">←</button><div class="backtitle">${tt("menuAbout")}</div></div>
+    <div class="doc">
+      <h2 class="doc-title">${tt("aboutTitle")}</h2>
+      <p class="doc-lead">${tt("aboutLead")}</p>
+      ${sec("aboutWhat","aboutWhatB")}
+      ${sec("aboutWhy","aboutWhyB")}
+      ${sec("aboutSafe","aboutSafeB")}
+      ${sec("aboutTeam","aboutTeamB")}
+      <button class="btn ghost" data-action="menu-nav" data-v="contact" style="margin-top:8px">✉️ ${tt("menuContact")}</button>
+    </div>
+  </div>`;
+}
+
+function renderTerms() {
+  const sec = (h, b) => `<h3 class="doc-h">${tt(h)}</h3><p class="doc-p">${tt(b)}</p>`;
+  scrollEl().innerHTML = `<div class="view" style="padding-bottom:60px">
+    <div class="backbar"><button class="back" data-action="back">←</button><div class="backtitle">${tt("menuTerms")}</div></div>
+    <div class="doc">
+      <h2 class="doc-title">${tt("termsTitle")}</h2>
+      <p class="doc-updated">${tt("termsUpdated")}</p>
+      <p class="doc-lead">${tt("termsIntro")}</p>
+      ${sec("t1h","t1b")}
+      ${sec("t2h","t2b")}
+      ${sec("t3h","t3b")}
+      ${sec("t4h","t4b")}
+      ${sec("t5h","t5b")}
+      ${sec("t6h","t6b")}
+    </div>
+  </div>`;
+}
+
+function renderContactSent() {
+  scrollEl().innerHTML = `<div class="view" style="padding-bottom:60px">
+    <div class="backbar"><button class="back" data-action="back">←</button><div class="backtitle">${tt("ctTitle")}</div></div>
+    <div class="success"><div class="big">📬</div><h3>${tt("ctSentTitle")}</h3>
+      <p class="muted small" style="line-height:1.7;max-width:300px;margin:0 auto 18px">${tt("ctSentBody")}</p>
+      <div class="contactcards" style="text-align:left;margin:0 auto 20px;max-width:320px">
+        ${contactCard("✉️", tt("ctEmailLabel"), CONTACT.email, "mailto:" + CONTACT.email)}
+      </div>
+      <div style="display:flex;gap:10px;justify-content:center">
+        <button class="btn ghost" data-action="back">← ${tt("back")}</button>
+        <button class="btn primary" data-action="nav-home">${tt("ctOkay")}</button>
+      </div>
+    </div></div>`;
 }
 
 function renderAuth() {
@@ -600,8 +695,8 @@ function renderAuth() {
     ${up ? `<div class="field"><label>${tt("name")} *</label><input id="au-name" placeholder="${tt("namePh")}"></div>` : ""}
     <div class="field"><label>${tt("email")} *</label><input id="au-email" type="email" placeholder="${tt("emailPh")}" autocomplete="email"></div>
     <div class="field"><label>${tt("pass")} *</label><input id="au-pass" type="password" placeholder="${tt("passPh")}" autocomplete="${up?"new-password":"current-password"}"></div>
+    ${up ? `<label class="agreebox"><input type="checkbox" id="au-agree"><span>${tt("agreeTerms")} <a data-action="menu-nav" data-v="terms" style="color:var(--teal);font-weight:700;cursor:pointer">${tt("agreeTermsLink")}</a>.</span></label>` : ""}
     <button class="btn primary" data-action="${up?"do-signup":"do-login"}">${up ? "✨ "+tt("createBtn") : "→ "+tt("signInBtn")}</button>
-    ${up ? `<div class="notebox" style="margin-top:12px">${tt("terms")}</div>` : ""}
     <div style="text-align:center;margin-top:16px" class="muted small">
       ${up ? tt("haveAcc") : tt("noAcc")}
       <a data-action="auth-tab" data-v="${up?"in":"up"}" style="color:var(--teal);font-weight:700;cursor:pointer">${up ? tt("signIn") : tt("signUp")}</a>
@@ -661,6 +756,8 @@ function renderDrawer() {
       <div class="ditem" data-action="menu-nav" data-v="library"><span class="ic">📚</span>${tt("menuLibrary")}</div>
       <div class="ditem" data-action="menu-nav" data-v="help"><span class="ic">🆘</span>${tt("menuHelp")}</div>
       <div class="ditem" data-action="menu-nav" data-v="contact"><span class="ic">✉️</span>${tt("menuContact")}</div>
+      <div class="ditem" data-action="menu-nav" data-v="about"><span class="ic">💛</span>${tt("menuAbout")}</div>
+      <div class="ditem" data-action="menu-nav" data-v="terms"><span class="ic">📄</span>${tt("menuTerms")}</div>
       <div class="dfoot"><div class="dtoggles">
         <button class="pill" data-action="toggle-lang">🌐 ${tt("langFull")}</button>
         <button class="pill" data-action="toggle-dark">${state.dark?"☀️":"🌙"} ${tt("dark")}</button>
@@ -673,7 +770,7 @@ function closeDrawer() { const d = $("#drawer"); d.classList.remove("open"); set
 /* ============================================================
    NAVIGATION + a11y
    ============================================================ */
-const VIEWS = { home: renderHome, topic: renderTopic, search: renderSearch, reader: renderReader, submit: renderSubmit, library: renderLibrary, help: renderHelp, contact: renderContact, auth: renderAuth };
+const VIEWS = { home: renderHome, topic: renderTopic, search: renderSearch, reader: renderReader, submit: renderSubmit, library: renderLibrary, help: renderHelp, contact: renderContact, contactSent: renderContactSent, about: renderAbout, terms: renderTerms, auth: renderAuth };
 
 /* Gate: run `action` if signed in + confirmed, else send to sign-in with a resume hint. */
 function requireAuth(gateMsg, action) {
@@ -848,7 +945,7 @@ document.addEventListener("click", async e => {
       const name = getCommentName();
       if (!name) {
         state.pendingComment = val;
-        openModal(`<h3>${tt("needNick")}</h3><div class="field"><label>${tt("nickPh")}</label><input id="nickinput" placeholder="e.g. Polepole"></div><button class="btn primary" data-action="nick-ok">${tt("nickBtn")}</button>`);
+        openModal(`<h3>${tt("needNick")}</h3><div class="field"><label>${tt("nickPh")}</label><input id="nickinput" placeholder="${tt("nickEg")}"></div><button class="btn primary" data-action="nick-ok">${tt("nickBtn")}</button>`);
         break;
       }
       await postComment(name, val); break;
@@ -880,13 +977,18 @@ document.addEventListener("click", async e => {
     case "contact-send": {
       const g = id => (($("#" + id) || {}).value || "").trim();
       const name = g("ct-name"), from = g("ct-email"), subject = g("ct-subject"), msg = g("ct-msg");
-      if (!subject || !msg) { toast("✋"); break; }
-      const bodyLines = [msg, "", "—", name ? "From: " + name : "", from ? "Reply to: " + from : ""].filter(Boolean);
+      // keep the draft so nothing is lost, regardless of what happens next
+      state.contactDraft = { name, email: from, subject, msg };
+      if (!name || !subject || !msg) { toast(tt("needFields") || "Please fill in your name, subject and message."); break; }
+      const bodyLines = [msg, "", "—", "From: " + name, from ? "Reply to: " + from : ""].filter(Boolean);
       const href = "mailto:" + CONTACT.email +
         "?subject=" + encodeURIComponent("[Quietly Here] " + subject) +
         "&body=" + encodeURIComponent(bodyLines.join("\n"));
-      window.location.href = href;
-      toast(tt("toastSent"));
+      // open the mail app in a new tab so we DON'T navigate away from the app;
+      // then show a persistent confirmation screen the sender controls
+      try { window.open(href, "_blank"); } catch (e) { window.location.href = href; }
+      state.contactDraft = null; // sent successfully — clear so the form is fresh next time
+      go("contactSent");
       break;
     }
     case "auth-tab": state.authMode = el.dataset.v; renderAuth(); break;
@@ -895,8 +997,9 @@ document.addEventListener("click", async e => {
       const g = id => (($("#" + id) || {}).value || "").trim();
       const name = g("au-name"), email = g("au-email"), pass = ($("#au-pass")||{}).value || "";
       if (!name || !email || !pass) { toast("✋"); break; }
+      if (!(($("#au-agree")||{}).checked)) { toast(tt("mustAgree")); break; }
       try {
-        const r = await api.post("/api/auth/signup", { name, email, password: pass });
+        const r = await api.post("/api/auth/signup", { name, email, password: pass, agreedTerms: true });
         renderCheckEmail(email);
       } catch (err) { toast("⚠️ " + err.message); }
       break;

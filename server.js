@@ -17,6 +17,18 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.set("trust proxy", 1); // Render sits behind a proxy; needed for real client IPs
+
+/* Canonical domain redirect: send visitors on the old onrender.com host (or any
+   other host) to the real custom domain. Configured via CANONICAL_HOST so it's
+   inert locally. 301 keeps SEO/bookmarks pointing at the right place. */
+const CANONICAL_HOST = process.env.CANONICAL_HOST || ""; // e.g. quietly-here.quiettruths.co.ke
+app.use((req, res, next) => {
+  if (CANONICAL_HOST && req.headers.host && req.headers.host !== CANONICAL_HOST) {
+    return res.redirect(301, "https://" + CANONICAL_HOST + req.originalUrl);
+  }
+  next();
+});
+
 app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
 
@@ -280,11 +292,12 @@ app.post("/api/auth/signup", wrap(async (req, res) => {
     // don't reveal whether an account exists — behave the same either way
     return res.json({ ok: true, pending: true, message: "If that email is new, we've sent a confirmation link. Please check your inbox." });
   }
+  if (!(req.body && req.body.agreedTerms)) return badRequest(res, "Please agree to the Terms & Privacy to create an account.");
   const { hash, salt } = hashPassword(password);
   const token = newToken();
   await q.run(
-    "INSERT INTO users (email,name,pass_hash,pass_salt,confirmed,confirm_token,confirm_sent_at,created_at) VALUES (?,?,?,?,0,?,?,?)",
-    [email, name, hash, salt, token, now(), now()]
+    "INSERT INTO users (email,name,pass_hash,pass_salt,confirmed,confirm_token,confirm_sent_at,created_at,agreed_terms_at) VALUES (?,?,?,?,0,?,?,?,?)",
+    [email, name, hash, salt, token, now(), now(), now()]
   );
   const link = baseUrl(req) + "/api/auth/confirm?token=" + token;
   await sendConfirmation({ to: email, name, link });

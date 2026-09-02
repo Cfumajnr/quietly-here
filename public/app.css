@@ -210,6 +210,22 @@ body{background:radial-gradient(1200px 700px at 20% -10%,#14332F 0%,#0C221F 55%,
 .hline .num{font-weight:700;color:var(--teal);font-family:var(--sans);font-size:14px;letter-spacing:.3px}
 .hline .svc{color:var(--muted);font-size:11.5px}
 .call{width:30px;height:30px;border-radius:50%;background:var(--teal-soft);color:var(--teal);display:flex;align-items:center;justify-content:center;text-decoration:none;font-size:13px;margin-left:auto;flex:0 0 auto}
+.contactcards{display:flex;flex-direction:column;gap:10px}
+.contactcard{display:flex;align-items:center;gap:13px;padding:14px;background:var(--surface);border:1px solid var(--line);border-radius:14px;text-decoration:none;color:var(--ink);box-shadow:var(--shadow);transition:transform .12s,border-color .12s}
+.contactcard:active{transform:scale(.98)}
+.contactcard .cc-ico{width:42px;height:42px;flex:0 0 auto;border-radius:12px;background:var(--teal-soft);display:flex;align-items:center;justify-content:center;font-size:20px}
+.contactcard .cc-tx{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+.contactcard .cc-tx b{font-size:14.5px;color:var(--ink)}
+.contactcard .cc-tx span{font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.contactcard .cc-go{margin-left:auto;color:var(--muted);font-size:22px;flex:0 0 auto}
+.agreebox{display:flex;align-items:flex-start;gap:10px;margin:14px 0 4px;font-size:13.5px;line-height:1.5;color:var(--muted);cursor:pointer}
+.agreebox input{width:20px;height:20px;flex:0 0 auto;margin-top:1px;accent-color:var(--teal)}
+.doc{padding:2px 2px 20px}
+.doc-title{font-size:22px;margin:6px 0 6px;color:var(--ink)}
+.doc-updated{font-size:12.5px;color:var(--muted);margin:0 0 14px}
+.doc-lead{font-size:15px;line-height:1.7;color:var(--ink);margin:0 0 18px}
+.doc-h{font-size:16px;margin:20px 0 6px;color:var(--teal)}
+.doc-p{font-size:14.5px;line-height:1.75;color:var(--ink);margin:0 0 6px}
 
 /* ---------- bottom nav + fab ---------- */
 .nav{position:absolute;left:0;right:0;bottom:0;background:color-mix(in srgb,var(--surface) 92%,transparent);backdrop-filter:blur(12px);border-top:1px solid var(--line);display:flex;justify-content:space-around;padding:8px 8px 14px;z-index:40}
