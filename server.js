@@ -163,8 +163,9 @@ app.post("/api/stories/:id/comments", wrap(async (req, res) => {
   )).n);
   if (cnt >= 20) return tooMany(res, 1800, "Hourly comment limit reached (20 per hour). Please try again later.");
 
-  const info = await q.run("INSERT INTO comments (story_id,name,text,device_id,ip,created_at) VALUES (?,?,?,?,?,?)",
-    [story.id, name, text, deviceId || null, ip, now()]);
+  const commenter = await currentUser(req); // null for guests
+  const info = await q.run("INSERT INTO comments (story_id,name,text,device_id,ip,created_at,user_id) VALUES (?,?,?,?,?,?,?)",
+    [story.id, name, text, deviceId || null, ip, now(), commenter ? commenter.id : null]);
   const c = await q.get("SELECT id,name,text,likes,loves,cares,created_at FROM comments WHERE id=?", [info.lastInsertRowid]);
   res.json({ ok: true, comment: { ...c, id: Number(c.id), likes: Number(c.likes), loves: Number(c.loves), cares: Number(c.cares) } });
 }));
@@ -408,6 +409,7 @@ app.get("/api/admin/stats", requireAdmin, wrap(async (req, res) => {
     openReports: await one("SELECT COUNT(*) n FROM reports WHERE status='open'"),
     comments: await one("SELECT COUNT(*) n FROM comments WHERE hidden=0"),
     blocks: await one("SELECT COUNT(*) n FROM blocks"),
+    users: await one("SELECT COUNT(*) n FROM users WHERE confirmed=1"),
     totalReads: await one("SELECT COALESCE(SUM(reads),0) n FROM stories WHERE status='published'")
   });
 }));
@@ -452,21 +454,59 @@ app.delete("/api/admin/stories/:id", requireAdmin, wrap(async (req, res) => {
   res.json({ ok: info.changes > 0 });
 }));
 
+app.get("/api/admin/users", requireAdmin, wrap(async (req, res) => {
+  const rows = await q.all(
+    `SELECT u.id, u.name, u.email, u.confirmed, u.created_at,
+            (SELECT COUNT(*) FROM stories s WHERE s.user_id = u.id) AS stories,
+            (SELECT COUNT(*) FROM comments c WHERE c.user_id = u.id) AS comments
+     FROM users u ORDER BY u.created_at DESC`);
+  res.json(rows.map(r => ({
+    id: Number(r.id), name: r.name, email: r.email, confirmed: !!r.confirmed,
+    created_at: r.created_at, stories: Number(r.stories || 0), comments: Number(r.comments || 0)
+  })));
+}));
+
+/* Admin composes and publishes a story directly (goes live immediately). */
+app.post("/api/admin/stories", requireAdmin, wrap(async (req, res) => {
+  const b = req.body || {};
+  const topic = TOPICS.includes(b.topic) ? b.topic : "life";
+  const lang = b.lang === "sw" ? "sw" : "en";
+  const title = clean(b.title, 160);
+  const body = clean(b.body, 20000);
+  const author = clean(b.author || b.pen, 60);
+  const pull = clean(b.pull, 200);
+  const excerpt = clean(b.excerpt, 200) || body.slice(0, 140);
+  if (!title || !body || !author) return badRequest(res, "Title, story and author are required.");
+  const mins = Math.max(1, Math.round(body.split(/\s+/).length / 200));
+  const info = await q.run(
+    `INSERT INTO stories (topic,lang,title,pull,excerpt,body,author,tough,helpline,mins,status,created_at,published_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?, 'published', ?, ?)`,
+    [topic, lang, title, pull || excerpt, excerpt, body, author, b.tough ? 1 : 0, b.helpline ? 1 : 0, mins, now(), now()]
+  );
+  res.json({ ok: true, id: info.lastInsertRowid, status: "published" });
+}));
+
 app.get("/api/admin/reports", requireAdmin, wrap(async (req, res) => {
   const rows = await q.all(`
     SELECT r.id report_id, r.reason, r.status, r.created_at,
            c.id comment_id, c.name, c.text, c.hidden, c.device_id,
+           cu.email comment_account_email, cu.name comment_account_name,
+           ru.email reporter_email, ru.name reporter_name,
            s.id story_id, s.title story_title
     FROM reports r JOIN comments c ON c.id = r.comment_id JOIN stories s ON s.id = c.story_id
+    LEFT JOIN users cu ON cu.id = c.user_id
+    LEFT JOIN users ru ON ru.id = r.user_id
     WHERE r.status='open' ORDER BY r.created_at DESC`);
   res.json(rows);
 }));
 
 app.get("/api/admin/comments", requireAdmin, wrap(async (req, res) => {
   const sid = req.query.story_id;
+  const sql = `SELECT c.*, u.email AS account_email, u.name AS account_name, u.confirmed AS account_confirmed
+               FROM comments c LEFT JOIN users u ON u.id = c.user_id`;
   const rows = sid
-    ? await q.all("SELECT * FROM comments WHERE story_id=? ORDER BY created_at DESC", [sid])
-    : await q.all("SELECT * FROM comments ORDER BY created_at DESC LIMIT 200");
+    ? await q.all(sql + " WHERE c.story_id=? ORDER BY c.created_at DESC", [sid])
+    : await q.all(sql + " ORDER BY c.created_at DESC LIMIT 200");
   res.json(rows);
 }));
 

@@ -143,7 +143,7 @@ async function loadStats(){
     const s = await api.get("/api/admin/stats"); state.stats = s;
     $("#stats").innerHTML = [
       ["pending","Pending"],["published","Published"],["openReports","Open reports"],
-      ["comments","Comments"],["blocks","Blocked"],["totalReads","Total reads"]
+      ["comments","Comments"],["users","Members"],["blocks","Blocked"],["totalReads","Total reads"]
     ].map(([k,l])=>`<div class="stat"><b>${(s[k]||0).toLocaleString()}</b><span>${l}</span></div>`).join("");
     renderTabs();
   } catch(e){ if(e.unauth) showLogin(); }
@@ -153,7 +153,9 @@ function renderTabs(){
   const tabs = [
     ["pending","📥 Queue", s.pending],
     ["published","📚 Published", 0],
+    ["compose","✍️ Write", 0],
     ["reports","🚩 Reports", s.openReports],
+    ["users","👥 Members", 0],
     ["blocks","⛔ Blocked", 0],
     ["rejected","🗑 Rejected", 0]
   ];
@@ -167,7 +169,9 @@ async function renderTab(){
     if(state.tab==="pending") return renderStories("pending");
     if(state.tab==="published") return renderStories("published");
     if(state.tab==="rejected") return renderStories("rejected");
+    if(state.tab==="compose") return renderCompose();
     if(state.tab==="reports") return renderReports();
+    if(state.tab==="users") return renderUsers();
     if(state.tab==="blocks") return renderBlocks();
   } catch(e){ if(e.unauth) return showLogin(); p.innerHTML=`<div class="empty">⚠️ ${esc(e.message)}</div>`; }
 }
@@ -231,9 +235,14 @@ async function toggleComments(storyId, box){
   box.innerHTML = `<div style="margin-top:14px">`+list.map(c=>commentRow(c)).join("")+`</div>`;
   bindComments(box);
 }
+function identityTag(email, name){
+  return email
+    ? `<span class="pill published" title="Registered member">👤 ${esc(email)}</span>`
+    : `<span class="pill pending" title="Guest — no account">👥 guest</span>`;
+}
 function commentRow(c){
   return `<div class="comment ${c.hidden?"hidden-c":""}" data-cid="${c.id}">
-    <div class="row"><span class="cn">${esc(c.name)}</span><span class="ct">${esc(c.created_at.slice(0,16).replace("T"," "))}</span>
+    <div class="row"><span class="cn">${esc(c.name)}</span> ${identityTag(c.account_email)}<span class="ct">${esc(c.created_at.slice(0,16).replace("T"," "))}</span>
       <span class="spacer"></span><span class="muted">👍${c.likes} ❤️${c.loves} 🤗${c.cares}</span></div>
     <div class="cx">${esc(c.text)}</div>
     <div class="row">
@@ -258,8 +267,10 @@ async function renderReports(){
   p.innerHTML = list.map(r=>`<div class="card" data-report="${r.report_id}" data-cid="${r.comment_id}">
     <span class="reason">⚑ ${esc(r.reason)}</span>
     <div class="muted">On story: <b>${esc(r.story_title)}</b></div>
+    <div class="muted" style="margin-top:4px">Reported by: ${r.reporter_email?`<b>${esc(r.reporter_email)}</b>`:"unknown"}</div>
     <div class="comment ${r.hidden?"hidden-c":""}" style="margin-top:10px">
-      <div class="cn">${esc(r.name)}</div><div class="cx">${esc(r.text)}</div></div>
+      <div class="row"><span class="cn">${esc(r.name)}</span> ${identityTag(r.comment_account_email)}</div>
+      <div class="cx">${esc(r.text)}</div></div>
     <div class="row" style="margin-top:10px">
       <button class="btn ghost sm" data-hide>${r.hidden?"Unhide comment":"Hide comment"}</button>
       <button class="btn ghost sm" data-block>Block "${esc(r.name)}"</button>
@@ -274,6 +285,59 @@ async function renderReports(){
     card.querySelector("[data-del]").onclick=async()=>{ if(confirm("Delete comment?")){ await api.del(`/api/admin/comments/${cid}`); await api.post(`/api/admin/reports/${rid}/resolve`); toast("Deleted & resolved"); refreshAll(); } };
     card.querySelector("[data-resolve]").onclick=async()=>{ await api.post(`/api/admin/reports/${rid}/resolve`); toast("Resolved"); refreshAll(); };
   });
+}
+
+async function renderUsers(){
+  const list = await api.get("/api/admin/users");
+  const p = $("#panel");
+  if(!list.length){ p.innerHTML = `<div class="empty">No members have signed up yet.</div>`; return; }
+  p.innerHTML = `<div class="muted" style="margin-bottom:10px">${list.length} member${list.length===1?"":"s"} · newest first</div>` +
+    list.map(u=>`<div class="card">
+      <div class="row">
+        <span class="cn" style="font-size:15px">${esc(u.name)}</span>
+        ${u.confirmed?`<span class="pill published">✓ confirmed</span>`:`<span class="pill pending">unconfirmed</span>`}
+        <span class="spacer"></span>
+        <span class="muted">joined ${esc(u.created_at.slice(0,10))}</span>
+      </div>
+      <div class="contact" style="margin-top:8px">📧 ${esc(u.email)}</div>
+      <div class="meta" style="margin-top:6px"><span>📝 ${u.stories} submission${u.stories===1?"":"s"}</span><span>💬 ${u.comments} comment${u.comments===1?"":"s"}</span></div>
+    </div>`).join("");
+}
+
+function renderCompose(){
+  const p = $("#panel");
+  const topicOpts = Object.entries(TOPICS).map(([k,l])=>`<option value="${k}">${l}</option>`).join("");
+  p.innerHTML = `<div class="card">
+    <h3 style="margin-top:0">✍️ Write a story (publishes immediately)</h3>
+    <div class="muted" style="margin-bottom:14px">As editor, your post goes live right away. You can set the caution wrappers below.</div>
+    <div class="field"><label>Title *</label><input id="cx-title" placeholder="A title that invites reading"></div>
+    <div class="row" style="gap:12px">
+      <div class="field" style="flex:1"><label>Topic</label><select id="cx-topic">${topicOpts}</select></div>
+      <div class="field" style="flex:1"><label>Language</label><select id="cx-lang"><option value="en">English</option><option value="sw">Kiswahili</option></select></div>
+    </div>
+    <div class="field"><label>Author / pen name *</label><input id="cx-author" placeholder="e.g. Polepole, or your name"></div>
+    <div class="field"><label>Pull quote (optional — the big cover text)</label><input id="cx-pull" placeholder="A short line shown on the cover"></div>
+    <div class="field"><label>Story *</label><textarea id="cx-body" rows="12" placeholder="Write the story. Separate paragraphs with a blank line." style="min-height:220px"></textarea></div>
+    <div class="row" style="margin:4px 0 14px">
+      <label class="check"><input type="checkbox" id="cx-tough"> ⚠️ Mark tough content</label>
+      <label class="check"><input type="checkbox" id="cx-help"> 🆘 Show helplines</label>
+    </div>
+    <button class="btn primary" id="cx-publish">📮 Publish now</button>
+  </div>`;
+  $("#cx-publish").onclick = async ()=>{
+    const g = id => ($("#"+id)||{}).value || "";
+    const title=g("cx-title").trim(), body=g("cx-body").trim(), author=g("cx-author").trim();
+    if(!title||!body||!author){ toast("Title, story and author are required."); return; }
+    try {
+      await api.post("/api/admin/stories", {
+        title, body, author, pull:g("cx-pull").trim(),
+        topic:g("cx-topic")||"life", lang:g("cx-lang")||"en",
+        tough:$("#cx-tough").checked, helpline:$("#cx-help").checked
+      });
+      toast("Published ✓");
+      state.tab="published"; renderTabs(); refreshAll();
+    } catch(e){ if(e.unauth) return showLogin(); toast("⚠️ "+e.message); }
+  };
 }
 
 async function renderBlocks(){

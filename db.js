@@ -69,6 +69,7 @@ async function migrate() {
   await ensure("reports", "ip", "TEXT");
   await ensure("stories", "user_id", "INTEGER");
   await ensure("reports", "user_id", "INTEGER");
+  await ensure("comments", "user_id", "INTEGER");
 }
 
 /* ---------- schema ---------- */
