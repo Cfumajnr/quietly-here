@@ -777,7 +777,8 @@ app.delete("/api/admin/blocks/:id", requireAdmin, wrap(async (req, res) => {
 /* ============================================================
    STATIC + ROUTES
    ============================================================ */
-app.use(express.static(path.join(__dirname, "public")));
+// dotfiles:"allow" so /.well-known/assetlinks.json (Digital Asset Links for the Android TWA) is served
+app.use(express.static(path.join(__dirname, "public"), { dotfiles: "allow" }));
 app.get("/admin", (req, res) => res.sendFile(path.join(__dirname, "public", "admin.html")));
 app.get("/", (req, res) => res.sendFile(path.join(__dirname, "public", "index.html")));
 
