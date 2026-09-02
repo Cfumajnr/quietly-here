@@ -35,6 +35,15 @@ const TOPICS = {
 const topicName = (k) => state.lang === "sw" ? TOPICS[k].sw : TOPICS[k].en;
 const topicDesc = (k) => state.lang === "sw" ? TOPICS[k].descSw : TOPICS[k].descEn;
 
+/* Content length limits (word counts). Kept in one place so the client hints and
+   the server validation stay in agreement. Comments: short but not one-word.
+   Stories: a real piece of writing, but bounded so the form can't be abused. */
+const LIMITS = {
+  comment: { min: 2,  max: 300 },      // ~2 to 300 words
+  story:   { min: 50, max: 2000 }      // ~50 to 2000 words
+};
+const wordCount = (s) => (String(s || "").trim().match(/\S+/g) || []).length;
+
 /* ---------- app state ---------- */
 const state = {
   lang: lsGet("qh.lang", "en"),
@@ -43,7 +52,8 @@ const state = {
   authMode: "in",           // 'in' | 'up' — sign-in vs create-account tab
   authNext: null,           // action to resume after a successful sign-in
   guestName: lsGet("qh.guestName", ""),
-  saved: lsGet("qh.saved", []),
+  saved: lsGet("qh.saved", []),                        // array of saved story IDs (for quick lookup + feed filtering)
+  savedStories: lsGet("qh.savedStories", []),          // full story objects so the library renders without the feed loaded
   reactedComments: lsGet("qh.reactedComments", {}),  // {storyId:{commentId:type}}
   progress: lsGet("qh.progress", {}),
   recents: lsGet("qh.recents", []),
@@ -73,7 +83,19 @@ const I18N = {
     read:"min read", reads:"reads",
     comments:"Comments", comment:"comment",
     reactLike:"Like",reactLove:"Love",reactCare:"Care",
-    save:"Save",saved:"Saved",
+    save:"Save",saved:"Saved",unsave:"Saved · tap to remove",
+    share:"Share", shareTitle:"Share this story", shareVia:"Share via",
+    shareWhatsApp:"WhatsApp", shareFacebook:"Facebook", shareX:"X (Twitter)", shareCopy:"Copy link",
+    shareNative:"More…", shareCopied:"Link copied to clipboard.",
+    savedMovedTitle:"Saved to your library",
+    savedMovedBody:"We've tucked this story into your Library and cleared it from your feed to keep things fresh. You can reopen it any time from Library.",
+    goToLibrary:"Go to Library", keepReading:"Keep reading",
+    cmMin:(n)=>`Please write a little more — at least ${n} words.`,
+    cmMax:(n)=>`That's over the ${n}-word limit for a comment. Please shorten it.`,
+    stMin:(n)=>`A story needs at least ${n} words. Tell us a little more.`,
+    stMax:(n)=>`Stories are limited to ${n} words. Please trim it down.`,
+    wordsLeft:(n)=>`${n} words left`, wordsOver:(n)=>`${n} words over the limit`,
+    wordsCount:(n)=>`${n} ${n===1?"word":"words"}`,
     related:"More like this",
     submitTitle:"Write a story",
     submitSub:"Your story will be reviewed by the moderator before publishing. Pen names are welcome.",
@@ -207,7 +229,19 @@ const I18N = {
     read:"dakika", reads:"wasomaji",
     comments:"Maoni", comment:"maoni",
     reactLike:"Penda",reactLove:"Upendo",reactCare:"Jali",
-    save:"Hifadhi",saved:"Imehifadhiwa",
+    save:"Hifadhi",saved:"Imehifadhiwa",unsave:"Imehifadhiwa · gusa kuondoa",
+    share:"Shiriki", shareTitle:"Shiriki hadithi hii", shareVia:"Shiriki kupitia",
+    shareWhatsApp:"WhatsApp", shareFacebook:"Facebook", shareX:"X (Twitter)", shareCopy:"Nakili kiungo",
+    shareNative:"Zaidi…", shareCopied:"Kiungo kimenakiliwa.",
+    savedMovedTitle:"Imehifadhiwa kwenye maktaba",
+    savedMovedBody:"Tumeihifadhi hadithi hii kwenye Maktaba yako na kuiondoa kwenye mlisho wako. Unaweza kuifungua tena wakati wowote kutoka Maktaba.",
+    goToLibrary:"Nenda Maktaba", keepReading:"Endelea kusoma",
+    cmMin:(n)=>`Tafadhali andika zaidi kidogo — angalau maneno ${n}.`,
+    cmMax:(n)=>`Umezidi kikomo cha maneno ${n} kwa maoni. Tafadhali fupisha.`,
+    stMin:(n)=>`Hadithi inahitaji angalau maneno ${n}. Tueleze zaidi kidogo.`,
+    stMax:(n)=>`Hadithi zina kikomo cha maneno ${n}. Tafadhali punguza.`,
+    wordsLeft:(n)=>`Maneno ${n} yamebaki`, wordsOver:(n)=>`Maneno ${n} zaidi ya kikomo`,
+    wordsCount:(n)=>`${n} ${n===1?"neno":"maneno"}`,
     related:"Nyingine kama hii",
     submitTitle:"Andika hadithi",
     submitSub:"Hadithi yako itakaguliwa na msimamizi kabla ya kuchapishwa. Majina ya kalamu yanakaribishwa.",
@@ -401,6 +435,8 @@ async function renderHome() {
   scrollEl().innerHTML = `<div class="view"><div class="loading">${tt("latest")}…</div></div>`;
   let stories = [];
   try { stories = await api.get("/api/stories?sort=new"); } catch (e) { return renderError(e); }
+  // saved stories live in the Library, not the feed — keep them out of Home
+  stories = stories.filter(s => !state.saved.includes(s.id));
   state.homeStories = stories;
   const f = stories[0];
   const topicCards = Object.keys(TOPICS).map(k => `
@@ -425,6 +461,8 @@ async function renderTopic() {
   scrollEl().innerHTML = `<div class="view"><div class="loading">…</div></div>`;
   let list = [];
   try { list = await api.get("/api/stories?topic=" + encodeURIComponent(k)); } catch (e) { return renderError(e); }
+  list = list.filter(s => !state.saved.includes(s.id));
+  state.topicStories = list;
   scrollEl().innerHTML = `<div class="view">
     <div class="backbar"><button class="back" data-action="back">←</button><div class="backtitle">${esc(topicName(k))}</div>
       <button class="iconbtn" data-action="toggle-lang" style="margin-left:auto"><b>${tt("langShort")}</b></button>
@@ -517,12 +555,16 @@ async function renderReader() {
     ${helpline}
     <div class="byline"><div class="avatar">${esc(s.author.charAt(0).toUpperCase())}</div>
       <div><div class="nm">${esc(s.author)}</div><div class="pen">${tt("penNote")}</div></div></div>
-    <div class="actionrow"><button class="abtn ${saved?"saved":""}" data-action="toggle-save">${saved?"✅ "+tt("saved"):"🔖 "+tt("save")}</button></div>
+    <div class="actionrow">
+      <button class="abtn ${saved?"saved":""}" data-action="toggle-save">${saved?"✅ "+tt("saved"):"🔖 "+tt("save")}</button>
+      <button class="abtn" data-action="share-story">🔗 ${tt("share")}</button>
+    </div>
     <div class="comhead">💬 ${tt("comments")} <span class="pillcount">${data.comments.length}</span></div>
     ${commentHTML}
     <div class="cominput"><div class="who">${esc((state.guestName||"?").charAt(0).toUpperCase())}</div>
-      <textarea id="comtext" placeholder="${tt("needNick")}"></textarea>
+      <textarea id="comtext" maxlength="2400" placeholder="${tt("needNick")}"></textarea>
       <button class="sendbtn" data-action="send-comment" aria-label="${tt("a11ySend")}">➤</button></div>
+    <div id="comcount" class="wcount">${tt("wordsCount")(0)} · ${LIMITS.comment.min}–${LIMITS.comment.max}</div>
     ${related?`<div class="related-title">${tt("related")}</div>${related}`:""}
   </div>`;
 }
@@ -535,7 +577,8 @@ function renderSubmit() {
     <div class="field"><label>${tt("fTitle")} *</label><input id="sub-title" placeholder="${tt("fTitlePh")}"></div>
     <div class="field"><label>${tt("fTopic")} *</label><select id="sub-topic">${topicOpts}</select></div>
     <div class="field"><label>${tt("fLang")} *</label><select id="sub-lang"><option value="en">${tt("fLangEn")}</option><option value="sw">${tt("fLangSw")}</option></select></div>
-    <div class="field"><label>${tt("fBody")} *</label><textarea id="sub-body" placeholder="${tt("fBodyPh")}"></textarea></div>
+    <div class="field"><label>${tt("fBody")} *</label><textarea id="sub-body" placeholder="${tt("fBodyPh")}"></textarea>
+      <div id="subcount" class="wcount">${tt("wordsCount")(0)} · ${LIMITS.story.min}–${LIMITS.story.max}</div></div>
     <div class="field"><label>${tt("fPen")} *</label><input id="sub-pen" placeholder="${tt("fPenPh")}" value="${esc((state.user&&state.user.name)||state.guestName||"")}"></div>
     <div class="field"><label>${tt("fContact")}</label><input id="sub-contact" placeholder="email@example.com / +254 7…" value="${esc((state.user&&state.user.email)||"")}"><div class="hint">${tt("fContactHint")}</div></div>
     <div class="notebox">${tt("fAgree")}</div>
@@ -549,14 +592,15 @@ function renderLibrary() {
   const tabHTML = tabs.map(([k,ic]) => `<button class="pill ${tab===k?"on":""}" data-action="libtab" data-v="${k}">${ic} ${tt("tab"+(k[0].toUpperCase()+k.slice(1)))}</button>`).join("");
   let body = "";
   if (tab === "saved") {
-    const saved = (state.homeStories.length ? state.homeStories : []).filter(s => state.saved.includes(s.id));
-    body = state.saved.length
-      ? (saved.length ? saved.map(cardHTML).join("") : `<div class="notebox">${tt("savedElsewhere")}</div>`)
+    // render from the cached full copies, so saved stories show even before any feed loads
+    const saved = state.savedStories.filter(s => state.saved.includes(s.id));
+    body = saved.length
+      ? saved.map(cardHTML).join("")
       : `<div class="notebox">${tt("noSaved")}</div>`;
   } else if (tab === "progress") {
     const prog = Object.entries(state.progress);
     body = prog.length ? prog.map(([id,pct]) => {
-      const s = (state.homeStories||[]).find(x => x.id === +id);
+      const s = (state.savedStories||[]).find(x => x.id === +id) || (state.homeStories||[]).find(x => x.id === +id);
       const title = s ? storyTitle(s) : ("#" + id);
       return `<div class="libcard" data-action="open-story" data-id="${id}" style="cursor:pointer">
         <h4>${esc(title)}</h4><div class="progressbar"><i style="width:${pct}%"></i></div>
@@ -911,10 +955,48 @@ document.addEventListener("click", async e => {
     case "toggle-save": {
       requireAuth(tt("gateSave"), () => {
         const id = state.readerId;
-        if (state.saved.includes(id)) { state.saved = state.saved.filter(x => x !== id); toast(tt("toastRemoved")); }
-        else { state.saved.push(id); toast(tt("toastSaved")); }
-        lsSet("qh.saved", state.saved); renderReader();
+        if (state.saved.includes(id)) {
+          // un-save: drop the id + the cached copy
+          state.saved = state.saved.filter(x => x !== id);
+          state.savedStories = state.savedStories.filter(s => s.id !== id);
+          persistSaved();
+          toast(tt("toastRemoved"));
+          renderReader();
+        } else {
+          // save: keep the id AND a full copy so the library renders standalone,
+          // then remove it from the loaded feeds so it disappears from the feed
+          state.saved.push(id);
+          const story = (state.reader && state.reader.story)
+            || state.homeStories.find(s => s.id === id)
+            || state.searchStories.find(s => s.id === id)
+            || state.topicStories.find(s => s.id === id);
+          if (story && !state.savedStories.some(s => s.id === id)) state.savedStories.push(story);
+          removeFromFeeds(id);
+          persistSaved();
+          // clear, persistent confirmation with a shortcut straight to the library
+          openModal(`<div style="text-align:center">
+            <div style="font-size:40px">🔖</div>
+            <h3>${tt("savedMovedTitle")}</h3>
+            <p class="muted small" style="line-height:1.65;margin:6px 0 18px">${tt("savedMovedBody")}</p>
+            <div style="display:flex;gap:10px">
+              <button class="btn ghost" data-action="close-modal" style="flex:1">${tt("keepReading")}</button>
+              <button class="btn primary" data-action="go-library" style="flex:1">📚 ${tt("goToLibrary")}</button>
+            </div></div>`);
+          renderReader();
+        }
       });
+      break;
+    }
+    case "go-library": closeModal(); go("library"); break;
+    case "close-modal": closeModal(); break;
+    case "share-story": {
+      const s = (state.reader && state.reader.story) || {};
+      openShareSheet(s);
+      break;
+    }
+    case "share-do": {
+      const s = (state.reader && state.reader.story) || {};
+      await doShare(el.dataset.net, s);
       break;
     }
     case "creact": {
@@ -942,6 +1024,9 @@ document.addEventListener("click", async e => {
     case "send-comment": {
       const ta = $("#comtext"); const val = (ta && ta.value || "").trim();
       if (!val) { toast("✋"); break; }
+      const wc = wordCount(val);
+      if (wc < LIMITS.comment.min) { toast(tt("cmMin")(LIMITS.comment.min)); break; }
+      if (wc > LIMITS.comment.max) { toast(tt("cmMax")(LIMITS.comment.max)); break; }
       const name = getCommentName();
       if (!name) {
         state.pendingComment = val;
@@ -961,7 +1046,10 @@ document.addEventListener("click", async e => {
       const g = id => ($("#" + id) || {}).value || "";
       const title = g("sub-title"), body = g("sub-body"), pen = g("sub-pen"), contact = g("sub-contact");
       const topic = g("sub-topic") || "life", lang = g("sub-lang") || "en";
-      if (!title || !body || !pen) { toast("✋"); break; }
+      if (!title || !body.trim() || !pen) { toast("✋"); break; }
+      const swc = wordCount(body);
+      if (swc < LIMITS.story.min) { toast(tt("stMin")(LIMITS.story.min)); break; }
+      if (swc > LIMITS.story.max) { toast(tt("stMax")(LIMITS.story.max)); break; }
       try {
         await api.post("/api/stories", { title, body, pen, contact, topic, lang, deviceId: deviceId() });
         toast(tt("toastSent"));
@@ -1039,8 +1127,8 @@ document.addEventListener("click", async e => {
     }
     case "use-recent": state.searchQ = el.dataset.q; renderSearch(); break;
     case "delete-data":
-      state.saved = []; state.reactedComments = {}; state.progress = {}; state.guestName = "";
-      ["qh.saved","qh.reactedComments","qh.progress","qh.guestName"].forEach(k => lsSet(k, k==="qh.guestName"?"":(k==="qh.reactedComments"||k==="qh.progress"?{}:[])));
+      state.saved = []; state.savedStories = []; state.reactedComments = {}; state.progress = {}; state.guestName = "";
+      ["qh.saved","qh.savedStories","qh.reactedComments","qh.progress","qh.guestName"].forEach(k => lsSet(k, k==="qh.guestName"?"":(k==="qh.reactedComments"||k==="qh.progress"?{}:[])));
       toast(tt("toastDelete")); go("library"); break;
   }
 });
@@ -1059,6 +1147,61 @@ async function refreshUser() {
   try { const r = await api.get("/api/auth/me"); state.user = r.user; } catch (e) { state.user = null; }
 }
 
+/* persist both the id list and the cached story copies */
+function persistSaved() {
+  lsSet("qh.saved", state.saved);
+  lsSet("qh.savedStories", state.savedStories);
+}
+/* pull a story out of every loaded feed so it vanishes from the feed once saved */
+function removeFromFeeds(id) {
+  state.homeStories = state.homeStories.filter(s => s.id !== id);
+  state.searchStories = state.searchStories.filter(s => s.id !== id);
+  state.topicStories = state.topicStories.filter(s => s.id !== id);
+}
+/* canonical, shareable URL for a story (deep link handled at boot) */
+function storyUrl(s) {
+  const base = location.origin + location.pathname.replace(/index\.html?$/, "");
+  return base + "?story=" + (s && s.id != null ? s.id : "");
+}
+function shareText(s) {
+  const title = s ? storyTitle(s) : "Quietly Here";
+  return `“${title}” — a story on Quietly Here`;
+}
+/* the share bottom-sheet: WhatsApp, Facebook, X, copy link, + native if available */
+function openShareSheet(s) {
+  const native = (navigator.share) ? `<button class="sharebtn" data-action="share-do" data-net="native"><span class="si">📱</span>${tt("shareNative")}</button>` : "";
+  openModal(`<div class="sharesheet">
+    <h3>${tt("shareTitle")}</h3>
+    <p class="muted small" style="margin:2px 0 14px">${esc(s ? storyTitle(s) : "")}</p>
+    <div class="sharegrid">
+      <button class="sharebtn wa" data-action="share-do" data-net="whatsapp"><span class="si">🟢</span>${tt("shareWhatsApp")}</button>
+      <button class="sharebtn fb" data-action="share-do" data-net="facebook"><span class="si">🔵</span>${tt("shareFacebook")}</button>
+      <button class="sharebtn xx" data-action="share-do" data-net="x"><span class="si">✖️</span>${tt("shareX")}</button>
+      <button class="sharebtn cp" data-action="share-do" data-net="copy"><span class="si">🔗</span>${tt("shareCopy")}</button>
+      ${native}
+    </div>
+    <button class="btn ghost" data-action="close-modal" style="width:100%;margin-top:14px">${tt("close")}</button>
+  </div>`);
+}
+async function doShare(net, s) {
+  const url = storyUrl(s);
+  const text = shareText(s);
+  if (net === "whatsapp") { window.open("https://wa.me/?text=" + encodeURIComponent(text + " " + url), "_blank"); closeModal(); return; }
+  if (net === "facebook") { window.open("https://www.facebook.com/sharer/sharer.php?u=" + encodeURIComponent(url), "_blank"); closeModal(); return; }
+  if (net === "x") { window.open("https://twitter.com/intent/tweet?text=" + encodeURIComponent(text) + "&url=" + encodeURIComponent(url), "_blank"); closeModal(); return; }
+  if (net === "copy") {
+    try { await navigator.clipboard.writeText(url); } catch (e) {
+      const t = document.createElement("textarea"); t.value = url; document.body.appendChild(t); t.select();
+      try { document.execCommand("copy"); } catch (e2) {} document.body.removeChild(t);
+    }
+    toast(tt("shareCopied")); closeModal(); return;
+  }
+  if (net === "native" && navigator.share) {
+    try { await navigator.share({ title: shareText(s), text, url }); } catch (e) {}
+    closeModal(); return;
+  }
+}
+
 async function postComment(name, text) {
   try {
     const r = await api.post(`/api/stories/${state.readerId}/comments`, { name, text, deviceId: deviceId() });
@@ -1068,7 +1211,19 @@ async function postComment(name, text) {
 
 document.addEventListener("input", e => {
   if (e.target && e.target.id === "searchinput") { state.searchQ = e.target.value; clearTimeout(window.__st); window.__st = setTimeout(renderResults, 200); }
+  if (e.target && e.target.id === "comtext") updateWordCount(e.target, "comcount", LIMITS.comment);
+  if (e.target && e.target.id === "sub-body") updateWordCount(e.target, "subcount", LIMITS.story);
 });
+/* live word counter under comment / story fields */
+function updateWordCount(ta, outId, lim) {
+  const out = $("#" + outId); if (!out) return;
+  const n = wordCount(ta.value);
+  let extra = "", cls = "wcount";
+  if (n > lim.max) { extra = " · " + tt("wordsOver")(n - lim.max); cls = "wcount over"; }
+  else if (n >= lim.min) { extra = " · " + tt("wordsLeft")(lim.max - n); cls = "wcount ok"; }
+  out.className = cls;
+  out.textContent = tt("wordsCount")(n) + " · " + lim.min + "–" + lim.max + extra;
+}
 document.addEventListener("keydown", e => {
   if (e.target && e.target.id === "searchinput" && e.key === "Enter") {
     const q = e.target.value.trim();
@@ -1188,5 +1343,12 @@ applyDark();
 try { history.replaceState({ qh: "root" }, ""); history.pushState({ qh: true }, ""); } catch (e) {}
 booted = true;
 go("home");
+// deep link: /?story=ID opens that story directly (used by shared links)
+(function openDeepLink() {
+  try {
+    const sid = new URLSearchParams(location.search).get("story");
+    if (sid && /^\d+$/.test(sid)) go("reader", { readerId: +sid });
+  } catch (e) {}
+})();
 // load any existing session, then refresh the current view so account UI shows
 refreshUser().then(() => { if (state.user) rerender(); });

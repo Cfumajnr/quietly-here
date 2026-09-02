@@ -59,6 +59,9 @@ const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).cat
 const clean = (s, max = 5000) => String(s == null ? "" : s).trim().slice(0, max);
 const TOPICS = ["life", "people", "moments", "hope"];
 const badRequest = (res, msg) => res.status(400).json({ error: msg || "Bad request" });
+const wordCount = (s) => (String(s || "").trim().match(/\S+/g) || []).length;
+// keep these in sync with LIMITS in public/app.js
+const LIMITS = { comment: { min: 2, max: 300 }, story: { min: 50, max: 2000 } };
 
 function storyToClient(row, { includePrivate = false } = {}) {
   const out = {
@@ -130,6 +133,9 @@ app.post("/api/stories", requireUser, wrap(async (req, res) => {
   const contact = clean(b.contact, 160);
   const excerpt = clean(b.excerpt, 200) || body.slice(0, 140);
   if (!title || !body || !author) return badRequest(res, "Title, story and pen name are required.");
+  const bwc = wordCount(body);
+  if (bwc < LIMITS.story.min) return badRequest(res, `A story needs at least ${LIMITS.story.min} words.`);
+  if (bwc > LIMITS.story.max) return badRequest(res, `Stories are limited to ${LIMITS.story.max} words.`);
 
   const id = who(req), ip = clientIp(req);
   // min 60s between submissions
@@ -156,9 +162,12 @@ app.post("/api/stories/:id/comments", wrap(async (req, res) => {
   const story = await q.get("SELECT id FROM stories WHERE id=? AND status='published'", [req.params.id]);
   if (!story) return res.status(404).json({ error: "Not found" });
   const name = clean(req.body && req.body.name, 40) || "Guest";
-  const text = clean(req.body && req.body.text, 1000);
+  const text = clean(req.body && req.body.text, 2400);
   const deviceId = clean(req.body && req.body.deviceId, 80);
   if (!text) return badRequest(res, "Comment cannot be empty.");
+  const twc = wordCount(text);
+  if (twc < LIMITS.comment.min) return badRequest(res, `Please write at least ${LIMITS.comment.min} words.`);
+  if (twc > LIMITS.comment.max) return badRequest(res, `Comments are limited to ${LIMITS.comment.max} words.`);
   const blockedName = await q.get("SELECT 1 FROM blocks WHERE kind='name' AND value=?", [name.toLowerCase()]);
   const blockedDev = deviceId ? await q.get("SELECT 1 FROM blocks WHERE kind='device' AND value=?", [deviceId]) : null;
   if (blockedName || blockedDev) return res.status(403).json({ error: "This account is blocked." });
