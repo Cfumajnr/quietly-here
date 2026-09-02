@@ -597,7 +597,8 @@ async function renderReader() {
 
   scrollEl().innerHTML = `<div class="view rbody" style="padding-bottom:120px">
     <div class="rtop backbar"><button class="back" data-action="back">←</button><div class="backtitle">${tt("back")}</div>
-      <button class="iconbtn" data-action="toggle-lang" style="margin-left:auto"><b>${tt("langShort")}</b></button>
+      <button class="iconbtn" data-action="share-story" style="margin-left:auto" title="${tt("share")}" aria-label="${tt("share")}">🔗</button>
+      <button class="iconbtn" data-action="toggle-lang"><b>${tt("langShort")}</b></button>
       <button class="iconbtn" data-action="toggle-dark">${state.dark?"☀️":"🌙"}</button></div>
     <div class="rcat">${esc(topicName(s.topic))} · ${langBadge}</div>
     <h1 class="rtitle">${esc(storyTitle(s))}</h1>
