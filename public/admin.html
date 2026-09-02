@@ -397,7 +397,7 @@ function renderCompose(){
     <div class="field"><label>Author / pen name *</label><input id="cx-author" placeholder="e.g. Polepole, or your name"></div>
     <div class="field"><label>Pull quote (optional — the big cover text)</label><input id="cx-pull" placeholder="A short line shown on the cover"></div>
     <div class="field"><label>Story *</label><textarea id="cx-body" rows="12" placeholder="Write the story. Separate paragraphs with a blank line." style="min-height:220px"></textarea>
-      <div class="muted" id="cx-count" style="text-align:right;margin-top:4px">0 words · max 5000</div></div>
+      <div id="cx-count" style="display:flex;justify-content:space-between;align-items:baseline;margin-top:5px"><b style="font-size:13px;color:var(--ink-soft)">✍️ Start writing…</b><span class="muted">max 5,000</span></div></div>
     <div class="row" style="margin:4px 0 14px">
       <label class="check"><input type="checkbox" id="cx-tough"> ⚠️ Mark tough content</label>
       <label class="check"><input type="checkbox" id="cx-help"> 🆘 Show helplines</label>
@@ -406,7 +406,12 @@ function renderCompose(){
   </div>`;
   const wc = s => (String(s||"").trim().match(/\S+/g)||[]).length;
   const body0 = $("#cx-body"), count0 = $("#cx-count");
-  if(body0 && count0){ body0.oninput = ()=>{ const n=wc(body0.value); count0.textContent = n+" words · max 5000"; count0.style.color = n>5000 ? "#B4442F" : ""; }; }
+  if(body0 && count0){ body0.oninput = ()=>{
+    const n=wc(body0.value), over=n>5000;
+    const big = n===0 ? "✍️ Start writing…" : `✍️ ${n.toLocaleString()} ${n===1?"word":"words"} written`;
+    const right = over ? `${(n-5000).toLocaleString()} over the limit` : "max 5,000";
+    count0.innerHTML = `<b style="font-size:13px;color:${over?"#B4442F":"var(--ink-soft)"}">${big}</b><span class="muted" style="${over?"color:#B4442F;font-weight:600":""}">${right}</span>`;
+  }; }
   $("#cx-publish").onclick = async ()=>{
     const g = id => ($("#"+id)||{}).value || "";
     const title=g("cx-title").trim(), body=g("cx-body").trim(), author=g("cx-author").trim();

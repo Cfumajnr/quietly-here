@@ -151,9 +151,12 @@ body{background:radial-gradient(1200px 700px at 20% -10%,#14332F 0%,#0C221F 55%,
 .cominput textarea{flex:1;resize:none;border:1.5px solid var(--line);background:var(--surface);border-radius:14px;padding:10px 12px;font-family:var(--sans);font-size:13.5px;color:var(--ink);min-height:44px;outline:none}
 .cominput textarea:focus{border-color:var(--teal)}
 .sendbtn{flex:0 0 auto;width:44px;height:44px;border-radius:14px;border:none;background:var(--teal);color:#fff;font-size:17px;cursor:pointer}
-.wcount{font-size:11.5px;color:var(--muted);margin:6px 2px 2px;text-align:right}
-.wcount.ok{color:var(--teal)}
-.wcount.over{color:#c0392b;font-weight:600}
+.wcount{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin:7px 2px 2px}
+.wcount .wc-n{font-size:13px;font-weight:700;color:var(--ink-soft);letter-spacing:.2px}
+.wcount .wc-r{font-size:11px;color:var(--muted)}
+.wcount.ok .wc-n{color:var(--teal)}
+.wcount.over .wc-n{color:#c0392b}
+.wcount.over .wc-r{color:#c0392b;font-weight:600}
 .sharesheet h3{margin:0 0 2px}
 .sharegrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .sharebtn{display:flex;align-items:center;gap:9px;padding:13px;border-radius:13px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:13.5px;font-weight:600;cursor:pointer;transition:transform .1s,border-color .1s}

@@ -94,8 +94,10 @@ const I18N = {
     cmMax:(n)=>`That's over the ${n}-word limit for a comment. Please shorten it.`,
     stMin:(n)=>`A story needs at least ${n} words. Tell us a little more.`,
     stMax:(n)=>`Stories are limited to ${n} words. Please trim it down.`,
-    wordsLeft:(n)=>`${n} words left`, wordsOver:(n)=>`${n} words over the limit`,
+    wordsLeft:(n)=>`${n} words left`, wordsOver:(n)=>`${n} over the limit`,
     wordsCount:(n)=>`${n} ${n===1?"word":"words"}`,
+    wordsWritten:(n)=>`✍️ ${n} ${n===1?"word":"words"} written`,
+    wordsStart:"✍️ Start writing…",
     related:"More like this",
     submitTitle:"Write a story",
     submitSub:"Your story will be reviewed by the moderator before publishing. Pen names are welcome.",
@@ -246,8 +248,10 @@ const I18N = {
     cmMax:(n)=>`Umezidi kikomo cha maneno ${n} kwa maoni. Tafadhali fupisha.`,
     stMin:(n)=>`Hadithi inahitaji angalau maneno ${n}. Tueleze zaidi kidogo.`,
     stMax:(n)=>`Hadithi zina kikomo cha maneno ${n}. Tafadhali punguza.`,
-    wordsLeft:(n)=>`Maneno ${n} yamebaki`, wordsOver:(n)=>`Maneno ${n} zaidi ya kikomo`,
+    wordsLeft:(n)=>`Maneno ${n} yamebaki`, wordsOver:(n)=>`${n} zaidi ya kikomo`,
     wordsCount:(n)=>`${n} ${n===1?"neno":"maneno"}`,
+    wordsWritten:(n)=>`✍️ Umeandika ${n} ${n===1?"neno":"maneno"}`,
+    wordsStart:"✍️ Anza kuandika…",
     related:"Nyingine kama hii",
     submitTitle:"Andika hadithi",
     submitSub:"Hadithi yako itakaguliwa na msimamizi kabla ya kuchapishwa. Majina ya kalamu yanakaribishwa.",
@@ -576,7 +580,7 @@ async function renderReader() {
     <div class="cominput"><div class="who">${esc((state.guestName||"?").charAt(0).toUpperCase())}</div>
       <textarea id="comtext" maxlength="2400" placeholder="${tt("needNick")}"></textarea>
       <button class="sendbtn" data-action="send-comment" aria-label="${tt("a11ySend")}">➤</button></div>
-    <div id="comcount" class="wcount">${tt("wordsCount")(0)} · ${LIMITS.comment.min}–${LIMITS.comment.max}</div>
+    <div id="comcount" class="wcount">${wcountInit(LIMITS.comment)}</div>
     ${related?`<div class="related-title">${tt("related")}</div>${related}`:""}
   </div>`;
 }
@@ -590,7 +594,7 @@ function renderSubmit() {
     <div class="field"><label>${tt("fTopic")} *</label><select id="sub-topic">${topicOpts}</select></div>
     <div class="field"><label>${tt("fLang")} *</label><select id="sub-lang"><option value="en">${tt("fLangEn")}</option><option value="sw">${tt("fLangSw")}</option></select></div>
     <div class="field"><label>${tt("fBody")} *</label><textarea id="sub-body" placeholder="${tt("fBodyPh")}"></textarea>
-      <div id="subcount" class="wcount">${tt("wordsCount")(0)} · ${LIMITS.story.min}–${LIMITS.story.max}</div></div>
+      <div id="subcount" class="wcount">${wcountInit(LIMITS.story)}</div></div>
     <div class="field"><label>${tt("fPen")} *</label><input id="sub-pen" placeholder="${tt("fPenPh")}" value="${esc((state.user&&state.user.name)||state.guestName||"")}"></div>
     <div class="field"><label>${tt("fContact")}</label><input id="sub-contact" placeholder="email@example.com / +254 7…" value="${esc((state.user&&state.user.email)||"")}"><div class="hint">${tt("fContactHint")}</div></div>
     <div class="notebox">${tt("fAgree")}</div>
@@ -1259,15 +1263,24 @@ document.addEventListener("input", e => {
   if (e.target && e.target.id === "comtext") updateWordCount(e.target, "comcount", LIMITS.comment);
   if (e.target && e.target.id === "sub-body") updateWordCount(e.target, "subcount", LIMITS.story);
 });
-/* live word counter under comment / story fields */
+/* initial (empty) counter markup — matches updateWordCount's two-part layout */
+function wcountInit(lim) {
+  return `<b class="wc-n">${tt("wordsStart")}</b><span class="wc-r">${fmtInt(lim.min)}–${fmtInt(lim.max)}</span>`;
+}
+/* live word counter under comment / story fields.
+   Leads with a bold, comma-formatted running total ("✍️ 1,000 words written")
+   so the writer always sees their progress — that visible number builds confidence.
+   A quieter second line shows the allowed range + status (left / over). */
 function updateWordCount(ta, outId, lim) {
   const out = $("#" + outId); if (!out) return;
   const n = wordCount(ta.value);
-  let extra = "", cls = "wcount";
-  if (n > lim.max) { extra = " · " + tt("wordsOver")(n - lim.max); cls = "wcount over"; }
-  else if (n >= lim.min) { extra = " · " + tt("wordsLeft")(lim.max - n); cls = "wcount ok"; }
+  const big = n === 0 ? tt("wordsStart") : tt("wordsWritten")(fmtInt(n));
+  let status = "", cls = "wcount";
+  if (n > lim.max) { status = tt("wordsOver")(fmtInt(n - lim.max)); cls = "wcount over"; }
+  else if (n >= lim.min) { status = tt("wordsLeft")(fmtInt(lim.max - n)); cls = "wcount ok"; }
+  const range = `${fmtInt(lim.min)}–${fmtInt(lim.max)}` + (status ? " · " + status : "");
   out.className = cls;
-  out.textContent = tt("wordsCount")(n) + " · " + lim.min + "–" + lim.max + extra;
+  out.innerHTML = `<b class="wc-n">${big}</b><span class="wc-r">${range}</span>`;
 }
 document.addEventListener("keydown", e => {
   if (e.target && e.target.id === "searchinput" && e.key === "Enter") {
