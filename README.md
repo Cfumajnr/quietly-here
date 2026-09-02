@@ -9,7 +9,7 @@ stories that a moderator approves before they go public.
 ```
 quietly-here-app/
 ├── server.js          # Express API + serves the app and admin panel
-├── db.js              # SQLite schema, seed data, password hashing
+├── db.js              # DB layer (local file for dev; Turso cloud for hosting), seed data, password hashing
 ├── seed-data.js       # the 6 starter stories (migrated from the prototype)
 ├── data/quietly.db    # the database (created automatically on first run)
 └── public/
@@ -87,5 +87,5 @@ TWA** (a thin native shell around the web app) with almost no code changes.
 
 - Add HTTPS (the hosts above give it automatically).
 - Consider rate-limiting the public POST endpoints (submissions/comments) to deter spam.
-- Back up `data/quietly.db` regularly (it's a single file — easy to copy).
+- In production the data lives in Turso (cloud); locally it's `data/quietly.db` (a single file — easy to copy for backups).
 - Optional: email notifications to the moderator when a new story is submitted.
