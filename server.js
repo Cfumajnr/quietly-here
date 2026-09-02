@@ -8,7 +8,7 @@ const express = require("express");
 const cookieParser = require("cookie-parser");
 const { q, init, verifyPassword, hashPassword, now } = require("./db.js");
 const rl = require("./ratelimit.js");
-const { sendConfirmation, sendPasswordReset, sendAdminReply } = require("./email.js");
+const { sendConfirmation, sendPasswordReset, sendAdminReply, sendSubscribeConfirm, sendNewStory } = require("./email.js");
 
 const APP_URL = process.env.APP_URL || ""; // e.g. https://quietly-here.onrender.com (for confirm links)
 const baseUrl = (req) => APP_URL || ((req.headers["x-forwarded-proto"] || "https") + "://" + req.headers.host);
@@ -460,6 +460,72 @@ app.get("/api/auth/me", wrap(async (req, res) => {
 }));
 
 /* ============================================================
+   SUBSCRIPTIONS (new-post updates) — double opt-in
+   ============================================================ */
+
+/* Subscribe an email (public box OR a signed-in member toggling on).
+   Double opt-in: we email a confirm link; only confirmed subscribers get sent to. */
+app.post("/api/subscribe", wrap(async (req, res) => {
+  const ip = clientIp(req);
+  if (rl.isLocked("sub:" + ip, 12, 60 * 60e3)) return tooMany(res, 3600, "Too many attempts. Please try again later.");
+  rl.recordFail("sub:" + ip, 12, 60 * 60e3);
+  const email = clean(req.body && req.body.email, 160).toLowerCase();
+  const source = clean(req.body && req.body.source, 40) || "web";
+  const generic = { ok: true, message: "Almost there! Check your inbox to confirm your subscription." };
+  if (!EMAIL_RE.test(email)) return badRequest(res, "Please enter a valid email address.");
+  const existing = await q.get("SELECT id, confirmed FROM subscribers WHERE email=?", [email]);
+  if (existing && existing.confirmed) return res.json({ ok: true, already: true, message: "You're already subscribed — thank you!" });
+  const confirmToken = newToken();
+  const unsubToken = newToken();
+  if (existing) {
+    await q.run("UPDATE subscribers SET confirm_token=?, unsub_token=COALESCE(unsub_token,?), source=? WHERE id=?",
+      [confirmToken, unsubToken, source, existing.id]);
+  } else {
+    await q.run("INSERT INTO subscribers (email, confirmed, confirm_token, unsub_token, source, created_at) VALUES (?,0,?,?,?,?)",
+      [email, confirmToken, unsubToken, source, now()]);
+  }
+  const link = baseUrl(req) + "/api/subscribe/confirm?token=" + confirmToken;
+  await sendSubscribeConfirm({ to: email, link });
+  res.json(generic);
+}));
+
+/* Confirm a subscription (opened from the email link) — renders a small page. */
+app.get("/api/subscribe/confirm", wrap(async (req, res) => {
+  const token = String(req.query.token || "");
+  const page = (title, msg, ok) => `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>${title}</title><body style="font-family:Segoe UI,Roboto,Arial,sans-serif;background:#F6F1E7;color:#24312B;margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px">
+    <div style="max-width:400px;text-align:center;background:#FFFDF8;border:1px solid #E5DCC9;border-radius:18px;padding:34px 26px;box-shadow:0 10px 30px rgba(30,40,33,.08)">
+    <div style="font-size:40px">${ok ? "✅" : "⚠️"}</div><h1 style="font-family:Georgia,serif;font-size:22px;margin:10px 0">${title}</h1>
+    <p style="color:#4C5A53;line-height:1.6;font-size:15px">${msg}</p>
+    <a href="/" style="display:inline-block;margin-top:16px;background:#155E5A;color:#fff;text-decoration:none;font-weight:700;padding:12px 24px;border-radius:10px">Open Quietly Here</a></div></body>`;
+  const s = token && await q.get("SELECT id, confirmed FROM subscribers WHERE confirm_token=?", [token]);
+  if (!s) return res.status(400).send(page("Link expired", "This confirmation link is invalid or has already been used.", false));
+  if (!s.confirmed) await q.run("UPDATE subscribers SET confirmed=1, confirm_token=NULL WHERE id=?", [s.id]);
+  res.send(page("You're subscribed!", "Thank you — we'll email you whenever a new story is published.", true));
+}));
+
+/* Unsubscribe (from an email footer link) — one click, no login. */
+app.get("/api/unsubscribe", wrap(async (req, res) => {
+  const token = String(req.query.token || "");
+  const page = (title, msg) => `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>${title}</title><body style="font-family:Segoe UI,Roboto,Arial,sans-serif;background:#F6F1E7;color:#24312B;margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px">
+    <div style="max-width:400px;text-align:center;background:#FFFDF8;border:1px solid #E5DCC9;border-radius:18px;padding:34px 26px;box-shadow:0 10px 30px rgba(30,40,33,.08)">
+    <div style="font-size:40px">👋</div><h1 style="font-family:Georgia,serif;font-size:22px;margin:10px 0">${title}</h1>
+    <p style="color:#4C5A53;line-height:1.6;font-size:15px">${msg}</p>
+    <a href="/" style="display:inline-block;margin-top:16px;background:#155E5A;color:#fff;text-decoration:none;font-weight:700;padding:12px 24px;border-radius:10px">Open Quietly Here</a></div></body>`;
+  if (token) await q.run("DELETE FROM subscribers WHERE unsub_token=?", [token]);
+  res.send(page("You've unsubscribed", "You won't receive any more update emails. You can resubscribe any time from the app."));
+}));
+
+/* Is this email already a confirmed subscriber? (lets the member toggle reflect state) */
+app.get("/api/subscribe/status", wrap(async (req, res) => {
+  const email = clean(req.query.email, 160).toLowerCase();
+  if (!EMAIL_RE.test(email)) return res.json({ subscribed: false });
+  const s = await q.get("SELECT confirmed FROM subscribers WHERE email=?", [email]);
+  res.json({ subscribed: !!(s && s.confirmed), pending: !!(s && !s.confirmed) });
+}));
+
+/* ============================================================
    ADMIN AUTH
    ============================================================ */
 const requireAdmin = wrap(async (req, res, next) => {
@@ -516,6 +582,7 @@ app.get("/api/admin/stats", requireAdmin, wrap(async (req, res) => {
     comments: await one("SELECT COUNT(*) n FROM comments WHERE hidden=0"),
     blocks: await one("SELECT COUNT(*) n FROM blocks"),
     users: await one("SELECT COUNT(*) n FROM users WHERE confirmed=1"),
+    subscribers: await one("SELECT COUNT(*) n FROM subscribers WHERE confirmed=1"),
     totalReads: await one("SELECT COALESCE(SUM(reads),0) n FROM stories WHERE status='published'")
   });
 }));
@@ -582,6 +649,49 @@ app.post("/api/admin/users/:id/email", requireAdmin, wrap(async (req, res) => {
   const r = await sendAdminReply({ to: u.email, name: u.name, subject, message });
   if (!r.ok) return res.status(502).json({ error: "Couldn't send the email: " + (r.error || "unknown error") });
   res.json({ ok: true, dev: !!r.dev });
+}));
+
+/* ---- Subscribers: list / count ---- */
+app.get("/api/admin/subscribers", requireAdmin, wrap(async (req, res) => {
+  const rows = await q.all("SELECT id, email, confirmed, source, created_at FROM subscribers ORDER BY created_at DESC");
+  res.json(rows.map(r => ({
+    id: Number(r.id), email: r.email, confirmed: !!r.confirmed,
+    source: r.source || "web", created_at: r.created_at
+  })));
+}));
+
+/* ---- Subscribers: CSV export ---- */
+app.get("/api/admin/subscribers.csv", requireAdmin, wrap(async (req, res) => {
+  const rows = await q.all("SELECT email, confirmed, source, created_at FROM subscribers ORDER BY created_at DESC");
+  const esc = (v) => `"${String(v == null ? "" : v).replace(/"/g, '""')}"`;
+  const lines = ["email,confirmed,source,created_at"];
+  for (const r of rows) lines.push([esc(r.email), esc(r.confirmed ? "yes" : "no"), esc(r.source || "web"), esc(r.created_at)].join(","));
+  res.setHeader("Content-Type", "text/csv; charset=utf-8");
+  res.setHeader("Content-Disposition", 'attachment; filename="quietly-here-subscribers.csv"');
+  res.send(lines.join("\n"));
+}));
+
+/* ---- Subscribers: remove one ---- */
+app.delete("/api/admin/subscribers/:id", requireAdmin, wrap(async (req, res) => {
+  await q.run("DELETE FROM subscribers WHERE id=?", [req.params.id]);
+  res.json({ ok: true });
+}));
+
+/* ---- Notify subscribers about a published story (manual trigger) ---- */
+app.post("/api/admin/stories/:id/notify", requireAdmin, wrap(async (req, res) => {
+  const story = await q.get("SELECT id, title, excerpt, status FROM stories WHERE id=?", [req.params.id]);
+  if (!story) return res.status(404).json({ error: "Story not found." });
+  if (story.status !== "published") return badRequest(res, "Only published stories can be sent to subscribers.");
+  const subs = await q.all("SELECT email, unsub_token FROM subscribers WHERE confirmed=1");
+  if (!subs.length) return res.json({ ok: true, sent: 0, message: "No confirmed subscribers yet." });
+  const url = baseUrl(req) + "/?story=" + Number(story.id);
+  let sent = 0, failed = 0, dev = false;
+  for (const s of subs) {
+    const unsubUrl = baseUrl(req) + "/api/unsubscribe?token=" + (s.unsub_token || "");
+    const r = await sendNewStory({ to: s.email, title: story.title, excerpt: story.excerpt, url, unsubUrl });
+    if (r.ok) { sent++; if (r.dev) dev = true; } else failed++;
+  }
+  res.json({ ok: true, sent, failed, dev, total: subs.length });
 }));
 
 /* Admin composes and publishes a story directly (goes live immediately). */

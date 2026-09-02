@@ -59,7 +59,7 @@ const state = {
   recents: lsGet("qh.recents", []),
   view: "home", readerId: null, topic: null,
   searchTopic: "all", searchLang: "all", searchSort: "new", searchQ: "",
-  libTab: "saved", pendingComment: null, subFile: false, contactDraft: null,
+  libTab: "saved", pendingComment: null, subFile: false, contactDraft: null, subStatus: undefined,
   // per-view data caches
   homeStories: [], topicStories: [], searchStories: [], reader: null
 };
@@ -71,6 +71,17 @@ const I18N = {
     latest:"Latest stories",
     browseBy:"Browse by topic",
     topics:"Topics",
+    subTitle:"Never miss a story",
+    subBody:"Get an email whenever a new story is published. No spam, unsubscribe anytime.",
+    subPh:"your@email.com",
+    subBtn:"Subscribe",
+    subDone:"Almost there! Check your inbox to confirm.",
+    subAlready:"You're already subscribed — thank you!",
+    subError:"Please enter a valid email address.",
+    subMemberOn:"Email me new stories",
+    subMemberBody:"We'll email you whenever a new story is published.",
+    subStatusOn:"Subscribed ✓ — you'll get new-story emails.",
+    subStatusPending:"Pending — check your inbox to confirm.",
     write:"Write a story",
     search:"Search",
     searchPh:"Search stories, writers, topics…",
@@ -225,6 +236,17 @@ const I18N = {
     latest:"Hadithi za hivi punde",
     browseBy:"Vinjari kwa mada",
     topics:"Mada",
+    subTitle:"Usikose hadithi yoyote",
+    subBody:"Pata barua pepe kila hadithi mpya inapochapishwa. Hakuna spam, jiondoe wakati wowote.",
+    subPh:"barua@pepe.com",
+    subBtn:"Jiandikishe",
+    subDone:"Karibu kumaliza! Angalia kikasha chako kuthibitisha.",
+    subAlready:"Tayari umejiandikisha — asante!",
+    subError:"Tafadhali weka barua pepe sahihi.",
+    subMemberOn:"Nitumie hadithi mpya",
+    subMemberBody:"Tutakutumia barua pepe kila hadithi mpya inapochapishwa.",
+    subStatusOn:"Umejiandikisha ✓ — utapata barua za hadithi mpya.",
+    subStatusPending:"Inasubiri — angalia kikasha chako kuthibitisha.",
     write:"Andika hadithi",
     search:"Tafuta",
     searchPh:"Tafuta hadithi, waandishi, mada…",
@@ -469,6 +491,21 @@ async function renderHome() {
     <div class="topicstrip">${topicCards}</div>
     <div class="sec-title">${tt("latest")}</div>
     ${latest || `<div class="notebox">${tt("noResults")}</div>`}
+    ${subscribeBoxHTML()}
+  </div>`;
+}
+
+/* the "get new stories by email" card shown on Home (public, no account needed) */
+function subscribeBoxHTML() {
+  const prefill = (state.user && state.user.email) || "";
+  return `<div class="subcard">
+    <div class="sub-ic" aria-hidden="true">✉️</div>
+    <h3>${tt("subTitle")}</h3>
+    <p>${tt("subBody")}</p>
+    <div class="sub-row">
+      <input id="sub-email" type="email" inputmode="email" autocomplete="email" placeholder="${tt("subPh")}" value="${esc(prefill)}">
+      <button class="btn primary" data-action="do-subscribe">${tt("subBtn")}</button>
+    </div>
   </div>`;
 }
 
@@ -632,11 +669,29 @@ function renderLibrary() {
           <div class="setrow"><span><b>${tt("notSignedIn")}</b><br><span class="muted small">${tt("authSub")}</span></span></div>
           <button class="btn primary" data-action="goto-auth" style="width:100%;margin-top:10px">→ ${tt("signIn")} / ${tt("signUp")}</button>
         </div>`;
-    body = acct + `<div class="libcard">
+    const subCard = state.user
+      ? `<div class="libcard">
+          <div class="setrow"><span><b>${tt("subMemberOn")}</b><br><span class="muted small">${
+            state.subStatus === "on" ? tt("subStatusOn")
+            : state.subStatus === "pending" ? tt("subStatusPending")
+            : tt("subMemberBody")}</span></span>
+            ${state.subStatus === "on"
+              ? `<span class="pill" style="background:var(--teal-soft);color:var(--teal)">✓</span>`
+              : `<button class="pill" data-action="toggle-subscribe" style="border:1px solid var(--line)">${tt("subBtn")}</button>`}
+          </div>
+        </div>` : "";
+    body = acct + subCard + `<div class="libcard">
       <div class="setrow"><span>${tt("settingDark")}</span><div class="toggle ${state.dark?"on":""}" data-action="toggle-dark"><i></i></div></div>
       <div class="setrow"><span>${tt("settingLang")} — ${tt("langFull")}</span><button class="pill" data-action="toggle-lang" style="border:1px solid var(--line)">${tt("langShort")}</button></div>
       <div class="setrow"><span>${tt("deleteAcc")}</span><button class="pill" data-action="delete-data" style="color:var(--rose);border:1px solid color-mix(in srgb,var(--rose) 40%,transparent)">${tt("deleteAcc")}</button></div>
     </div>`;
+    // fetch subscription status once, then re-render so the card reflects it
+    if (state.user && state.subStatus === undefined) {
+      state.subStatus = null;
+      api.get("/api/subscribe/status?email=" + encodeURIComponent(state.user.email))
+        .then(r => { state.subStatus = r.subscribed ? "on" : (r.pending ? "pending" : "off"); if (state.view === "library" && state.libTab === "settings") renderLibrary(); })
+        .catch(() => {});
+    }
   }
   scrollEl().innerHTML = `<div class="view" style="padding-bottom:60px">
     <div class="topbar"><div class="logo"><div class="mark">📚</div><div class="name" style="font-size:15px">${tt("libTitle")}</div></div>
@@ -1038,6 +1093,27 @@ document.addEventListener("click", async e => {
       await doShare(el.dataset.net, s);
       break;
     }
+    case "do-subscribe": {
+      const email = (($("#sub-email") || {}).value || "").trim();
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { toast(tt("subError")); break; }
+      try {
+        const r = await api.post("/api/subscribe", { email, source: state.user ? "member" : "home" });
+        toast(r.already ? tt("subAlready") : tt("subDone"));
+        const inp = $("#sub-email"); if (inp && !r.already) inp.value = "";
+      } catch (err) { toast("⚠️ " + err.message); }
+      break;
+    }
+    case "toggle-subscribe": {
+      // member toggle in Library settings
+      const email = state.user && state.user.email; if (!email) break;
+      try {
+        const r = await api.post("/api/subscribe", { email, source: "member" });
+        toast(r.already ? tt("subAlready") : tt("subDone"));
+        state.subStatus = r.already ? "on" : "pending";
+        renderLibrary();
+      } catch (err) { toast("⚠️ " + err.message); }
+      break;
+    }
     case "creact": {
       const cid = +el.dataset.cid, typ = el.dataset.type;
       try {
@@ -1162,7 +1238,7 @@ document.addEventListener("click", async e => {
     }
     case "sign-out": {
       try { await api.post("/api/auth/logout", {}); } catch (e) {}
-      state.user = null;
+      state.user = null; state.subStatus = undefined;
       // saved list is device-local; keep it but it will re-gate on next save
       toast(tt("toastSignOut")); renderLibrary(); break;
     }

@@ -107,7 +107,11 @@ const SCHEMA = [
   confirmed INTEGER NOT NULL DEFAULT 0, confirm_token TEXT, confirm_sent_at TEXT,
   created_at TEXT NOT NULL )`,
 `CREATE TABLE IF NOT EXISTS user_sessions (
-  token TEXT PRIMARY KEY, user_id INTEGER NOT NULL, created_at TEXT NOT NULL )`
+  token TEXT PRIMARY KEY, user_id INTEGER NOT NULL, created_at TEXT NOT NULL )`,
+`CREATE TABLE IF NOT EXISTS subscribers (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE NOT NULL,
+  confirmed INTEGER NOT NULL DEFAULT 0, confirm_token TEXT,
+  unsub_token TEXT, source TEXT, created_at TEXT NOT NULL )`
 ];
 
 /* ---------- seed + init ---------- */
