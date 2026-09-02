@@ -340,8 +340,12 @@ function cardHTML(s) {
     </div></div>`;
 }
 function topbarHTML(markEmoji, titleText) {
+  const acct = state.user
+    ? `<button class="iconbtn" data-action="menu-nav" data-v="library" title="${esc(state.user.name)}" aria-label="${esc(state.user.name)}"><b>${esc((state.user.name||"?").charAt(0).toUpperCase())}</b></button>`
+    : `<button class="iconbtn" data-action="goto-auth" title="${tt("signIn")}" aria-label="${tt("signIn")}">👤</button>`;
   return `<div class="topbar">
     <div class="logo"><div class="mark">${markEmoji || "🤫"}</div><div class="name" style="font-size:${titleText?15:17}px">${titleText || "Quietly Here"}${titleText?"":`<small>${tt("tagline")}</small>`}</div></div>
+    ${acct}
     <button class="iconbtn" data-action="open-drawer" title="Menu">☰</button>
     <button class="iconbtn" data-action="toggle-lang" title="EN / SW"><b>${tt("langShort")}</b></button>
     <button class="iconbtn" data-action="toggle-dark">${state.dark?"☀️":"🌙"}</button>
@@ -650,6 +654,10 @@ function renderDrawer() {
       <div class="ditem" data-action="menu-nav" data-v="search"><span class="ic">🔍</span>${tt("menuSearch")}</div>
       <div class="ditem" data-action="open-submit"><span class="ic">✍️</span>${tt("menuWrite")}</div>
       <div class="dsec">${tt("yourspace")}</div>
+      ${state.user
+        ? `<div class="ditem" data-action="menu-nav" data-v="library"><span class="ic">👤</span>${esc(state.user.name)}</div>
+           <div class="ditem" data-action="menu-signout"><span class="ic">🚪</span>${tt("signOut")}</div>`
+        : `<div class="ditem" data-action="menu-auth"><span class="ic">👤</span>${tt("signIn")} / ${tt("signUp")}</div>`}
       <div class="ditem" data-action="menu-nav" data-v="library"><span class="ic">📚</span>${tt("menuLibrary")}</div>
       <div class="ditem" data-action="menu-nav" data-v="help"><span class="ic">🆘</span>${tt("menuHelp")}</div>
       <div class="ditem" data-action="menu-nav" data-v="contact"><span class="ic">✉️</span>${tt("menuContact")}</div>
@@ -919,6 +927,13 @@ document.addEventListener("click", async e => {
       toast(tt("toastSignOut")); renderLibrary(); break;
     }
     case "goto-auth": state.authMode = "in"; go("auth"); break;
+    case "menu-auth": closeDrawer(); state.authMode = "in"; setTimeout(() => go("auth"), 120); break;
+    case "menu-signout": {
+      closeDrawer();
+      try { await api.post("/api/auth/logout", {}); } catch (e) {}
+      state.user = null;
+      toast(tt("toastSignOut")); rerender(); break;
+    }
     case "use-recent": state.searchQ = el.dataset.q; renderSearch(); break;
     case "delete-data":
       state.saved = []; state.reactedComments = {}; state.progress = {}; state.guestName = "";
@@ -1027,13 +1042,16 @@ document.addEventListener("click", e => { if (e.target.id === "modal") closeModa
     if (!pulling || refreshing) return;
     dist = e.touches[0].clientY - startY;
     if (dist <= 0) { pulling = false; ind.style.opacity = "0"; ind.style.transform = "translate(-50%,-46px)"; return; }
+    // We're pulling down from the very top: take over from the browser's own
+    // pull gesture so the page can't rubber-band / hide the header.
+    if (el.scrollTop <= 0 && e.cancelable) e.preventDefault();
     // resistance curve so it feels rubbery
     const pull = Math.min(MAX, dist * 0.5);
     ind.style.transition = "none";
     ind.style.opacity = String(Math.min(1, pull / THRESHOLD));
     ind.style.transform = `translate(-50%,${pull - 46}px)`;
     ind.querySelector(".ptr-spin").style.transform = `rotate(${pull * 3}deg)`;
-  }, { passive: true });
+  }, { passive: false });
 
   el.addEventListener("touchend", async () => {
     if (!pulling || refreshing) { pulling = false; return; }
