@@ -74,4 +74,73 @@ If you didn't create this account, you can safely ignore this message.
   return sendMail({ to, subject, html, text });
 }
 
-module.exports = { sendMail, sendConfirmation };
+/* Password reset email with a big button + fallback link. */
+async function sendPasswordReset({ to, name, link }) {
+  const safeName = escapeHtml(name || "there");
+  const safeLink = escapeHtml(link);
+  const subject = "Reset your Quietly Here password";
+  const text =
+`Hi ${name || "there"},
+
+We received a request to reset the password for your Quietly Here account.
+
+Set a new password here (the link expires in 1 hour):
+${link}
+
+If you didn't ask for this, you can safely ignore this email — your password won't change.
+
+— Quietly Here`;
+  const html =
+`<div style="font-family:Segoe UI,Roboto,Arial,sans-serif;max-width:480px;margin:0 auto;color:#24312B">
+  <div style="background:linear-gradient(140deg,#155E5A,#0E423F);border-radius:16px;padding:26px 24px;text-align:center;color:#F6F1E7">
+    <div style="font-size:30px;line-height:1">&ldquo;</div>
+    <h1 style="font-family:Georgia,serif;font-size:22px;margin:6px 0 2px">Quietly Here</h1>
+    <div style="font-size:13px;opacity:.85">Read in silence. Speak without judgment.</div>
+  </div>
+  <div style="padding:24px 6px">
+    <p style="font-size:15px;line-height:1.6">Hi ${safeName},</p>
+    <p style="font-size:15px;line-height:1.6">We received a request to reset your password. Tap the button below to choose a new one. This link expires in <b>1 hour</b>.</p>
+    <p style="text-align:center;margin:26px 0">
+      <a href="${safeLink}" style="background:#155E5A;color:#fff;text-decoration:none;font-weight:700;font-size:15px;padding:13px 26px;border-radius:10px;display:inline-block">Reset my password</a>
+    </p>
+    <p style="font-size:13px;color:#7C877F;line-height:1.6">If the button doesn't work, copy this link into your browser:<br>
+      <a href="${safeLink}" style="color:#155E5A;word-break:break-all">${safeLink}</a></p>
+    <p style="font-size:13px;color:#7C877F;line-height:1.6">If you didn't ask to reset your password, you can safely ignore this email — nothing will change.</p>
+  </div>
+</div>`;
+  return sendMail({ to, subject, html, text });
+}
+
+/* A personal reply from the moderator to a member (used from the admin panel). */
+async function sendAdminReply({ to, name, subject, message }) {
+  const safeName = escapeHtml(name || "there");
+  const finalSubject = subject && subject.trim() ? subject.trim() : "A message from Quietly Here";
+  const paragraphs = String(message || "").split(/\n{2,}/).map(p => p.trim()).filter(Boolean);
+  const text =
+`Hi ${name || "there"},
+
+${message}
+
+— The Quietly Here team
+write@quiettruths.co.ke`;
+  const htmlBody = paragraphs.map(p =>
+    `<p style="font-size:15px;line-height:1.7;margin:0 0 14px">${escapeHtml(p).replace(/\n/g, "<br>")}</p>`
+  ).join("");
+  const html =
+`<div style="font-family:Segoe UI,Roboto,Arial,sans-serif;max-width:480px;margin:0 auto;color:#24312B">
+  <div style="background:linear-gradient(140deg,#155E5A,#0E423F);border-radius:16px;padding:26px 24px;text-align:center;color:#F6F1E7">
+    <div style="font-size:30px;line-height:1">&ldquo;</div>
+    <h1 style="font-family:Georgia,serif;font-size:22px;margin:6px 0 2px">Quietly Here</h1>
+    <div style="font-size:13px;opacity:.85">Read in silence. Speak without judgment.</div>
+  </div>
+  <div style="padding:24px 6px">
+    <p style="font-size:15px;line-height:1.6">Hi ${safeName},</p>
+    ${htmlBody}
+    <p style="font-size:14px;color:#4C5A53;line-height:1.6;margin-top:20px">— The Quietly Here team<br>
+      <a href="mailto:write@quiettruths.co.ke" style="color:#155E5A">write@quiettruths.co.ke</a></p>
+  </div>
+</div>`;
+  return sendMail({ to, subject: finalSubject, html, text });
+}
+
+module.exports = { sendMail, sendConfirmation, sendPasswordReset, sendAdminReply };

@@ -123,6 +123,12 @@ const I18N = {
     authWhy:"Why an account?",
     authWhyB:"To keep this a safe, spam-free space, saving stories, submitting writing and reporting comments need a confirmed email. Reading and commenting stay open to everyone.",
     haveAcc:"Already have an account?", noAcc:"New here?",
+    forgotLink:"Forgot your password?",
+    forgotTitle:"Reset password",
+    forgotSub:"Enter the email you signed up with and we'll send you a link to set a new password.",
+    forgotSend:"Send reset link",
+    forgotSentTitle:"Check your inbox",
+    forgotSentBody:"If that email has an account, we've sent a reset link. It expires in 1 hour. Don't forget to check your spam folder.",
     checkEmail:"Check your email",
     checkEmailB:"We've sent a confirmation link to your inbox. Tap it to activate your account — then come back and sign in.",
     resendEmail:"Resend the email", resent:"Sent! Check your inbox.",
@@ -269,6 +275,12 @@ const I18N = {
     authWhy:"Kwa nini akaunti?",
     authWhyB:"Ili kulinda nafasi hii salama na bila spam, kuhifadhi hadithi, kutuma maandishi na kuripoti maoni kunahitaji barua pepe iliyothibitishwa. Kusoma na kutoa maoni kunabaki wazi kwa wote.",
     haveAcc:"Tayari una akaunti?", noAcc:"Ni mgeni hapa?",
+    forgotLink:"Umesahau nenosiri?",
+    forgotTitle:"Weka upya nenosiri",
+    forgotSub:"Weka barua pepe uliyojisajili nayo na tutakutumia kiungo cha kuweka nenosiri jipya.",
+    forgotSend:"Tuma kiungo",
+    forgotSentTitle:"Angalia kikasha chako",
+    forgotSentBody:"Ikiwa barua pepe hiyo ina akaunti, tumetuma kiungo cha kuweka upya. Kinaisha muda baada ya saa moja. Usisahau kuangalia folda ya taka (spam).",
     checkEmail:"Angalia barua pepe yako",
     checkEmailB:"Tumetuma kiungo cha uthibitisho kwenye sanduku lako. Gusa ili kuamilisha akaunti yako — kisha rudi uingie.",
     resendEmail:"Tuma barua pepe tena", resent:"Imetumwa! Angalia sanduku lako.",
@@ -741,12 +753,35 @@ function renderAuth() {
     <div class="field"><label>${tt("pass")} *</label><input id="au-pass" type="password" placeholder="${tt("passPh")}" autocomplete="${up?"new-password":"current-password"}"></div>
     ${up ? `<label class="agreebox"><input type="checkbox" id="au-agree"><span>${tt("agreeTerms")} <a data-action="menu-nav" data-v="terms" style="color:var(--teal);font-weight:700;cursor:pointer">${tt("agreeTermsLink")}</a>.</span></label>` : ""}
     <button class="btn primary" data-action="${up?"do-signup":"do-login"}">${up ? "✨ "+tt("createBtn") : "→ "+tt("signInBtn")}</button>
+    ${up ? "" : `<div style="text-align:center;margin-top:12px"><a data-action="goto-forgot" style="color:var(--teal);font-weight:600;cursor:pointer;font-size:13px">${tt("forgotLink")}</a></div>`}
     <div style="text-align:center;margin-top:16px" class="muted small">
       ${up ? tt("haveAcc") : tt("noAcc")}
       <a data-action="auth-tab" data-v="${up?"in":"up"}" style="color:var(--teal);font-weight:700;cursor:pointer">${up ? tt("signIn") : tt("signUp")}</a>
     </div>
     <div class="helpblock" style="margin-top:22px"><h4>🔒 ${tt("authWhy")}</h4><p class="muted small" style="line-height:1.6">${tt("authWhyB")}</p></div>
   </div>`;
+}
+
+function renderForgot() {
+  scrollEl().innerHTML = `<div class="view" style="padding-bottom:60px">
+    <div class="backbar"><button class="back" data-action="back">←</button><div class="backtitle">${tt("forgotTitle")}</div></div>
+    <div class="art typo grad-teal" style="height:100px;border-radius:16px;margin-bottom:18px"><span class="qmark">🔑</span></div>
+    <p class="muted small" style="margin:0 0 16px;line-height:1.6">${tt("forgotSub")}</p>
+    <div class="field"><label>${tt("email")} *</label><input id="fg-email" type="email" placeholder="${tt("emailPh")}" autocomplete="email"></div>
+    <button class="btn primary" data-action="do-forgot">✉️ ${tt("forgotSend")}</button>
+    <div style="text-align:center;margin-top:16px" class="muted small">
+      <a data-action="goto-signin" style="color:var(--teal);font-weight:700;cursor:pointer">← ${tt("signIn")}</a>
+    </div>
+  </div>`;
+}
+
+function renderForgotSent(email) {
+  scrollEl().innerHTML = `<div class="view" style="padding-bottom:60px">
+    <div class="backbar"><button class="back" data-action="back">←</button><div class="backtitle">${tt("forgotTitle")}</div></div>
+    <div class="success"><div class="big">📬</div><h3>${tt("forgotSentTitle")}</h3>
+      <p class="muted small" style="line-height:1.7;max-width:300px;margin:0 auto 18px">${tt("forgotSentBody")}</p>
+      <div style="margin-top:6px"><button class="btn primary" data-action="goto-signin">→ ${tt("signIn")}</button></div>
+    </div></div>`;
 }
 
 function renderCheckEmail(email) {
@@ -814,7 +849,7 @@ function closeDrawer() { const d = $("#drawer"); d.classList.remove("open"); set
 /* ============================================================
    NAVIGATION + a11y
    ============================================================ */
-const VIEWS = { home: renderHome, topic: renderTopic, search: renderSearch, reader: renderReader, submit: renderSubmit, library: renderLibrary, help: renderHelp, contact: renderContact, contactSent: renderContactSent, about: renderAbout, terms: renderTerms, auth: renderAuth };
+const VIEWS = { home: renderHome, topic: renderTopic, search: renderSearch, reader: renderReader, submit: renderSubmit, library: renderLibrary, help: renderHelp, contact: renderContact, contactSent: renderContactSent, about: renderAbout, terms: renderTerms, auth: renderAuth, forgot: renderForgot };
 
 /* Gate: run `action` if signed in + confirmed, else send to sign-in with a resume hint. */
 function requireAuth(gateMsg, action) {
@@ -1081,6 +1116,16 @@ document.addEventListener("click", async e => {
     }
     case "auth-tab": state.authMode = el.dataset.v; renderAuth(); break;
     case "goto-signin": state.authMode = "in"; go("auth"); break;
+    case "goto-forgot": go("forgot"); break;
+    case "do-forgot": {
+      const email = (($("#fg-email")||{}).value || "").trim();
+      if (!email) { toast("✋"); break; }
+      try {
+        await api.post("/api/auth/forgot", { email });
+        renderForgotSent(email);
+      } catch (err) { toast("⚠️ " + err.message); }
+      break;
+    }
     case "do-signup": {
       const g = id => (($("#" + id) || {}).value || "").trim();
       const name = g("au-name"), email = g("au-email"), pass = ($("#au-pass")||{}).value || "";

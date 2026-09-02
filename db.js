@@ -71,6 +71,8 @@ async function migrate() {
   await ensure("reports", "user_id", "INTEGER");
   await ensure("comments", "user_id", "INTEGER");
   await ensure("users", "agreed_terms_at", "TEXT");
+  await ensure("users", "reset_token", "TEXT");
+  await ensure("users", "reset_sent_at", "TEXT");
 }
 
 /* ---------- schema ---------- */

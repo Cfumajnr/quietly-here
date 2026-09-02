@@ -8,7 +8,7 @@ const express = require("express");
 const cookieParser = require("cookie-parser");
 const { q, init, verifyPassword, hashPassword, now } = require("./db.js");
 const rl = require("./ratelimit.js");
-const { sendConfirmation } = require("./email.js");
+const { sendConfirmation, sendPasswordReset, sendAdminReply } = require("./email.js");
 
 const APP_URL = process.env.APP_URL || ""; // e.g. https://quietly-here.onrender.com (for confirm links)
 const baseUrl = (req) => APP_URL || ((req.headers["x-forwarded-proto"] || "https") + "://" + req.headers.host);
@@ -346,6 +346,86 @@ app.post("/api/auth/resend", wrap(async (req, res) => {
   res.json({ ok: true, message: "If that account needs confirming, we've sent a fresh link." });
 }));
 
+/* ---- Forgot password: request a reset link ---- */
+app.post("/api/auth/forgot", wrap(async (req, res) => {
+  const ip = clientIp(req);
+  if (rl.isLocked("forgot:" + ip, 8, 60 * 60e3)) return tooMany(res, 3600, "Too many reset requests. Please try again later.");
+  rl.recordFail("forgot:" + ip, 8, 60 * 60e3);
+  const email = clean(req.body && req.body.email, 160).toLowerCase();
+  // Always respond the same way so we never reveal whether an account exists.
+  const generic = { ok: true, message: "If that email has an account, we've sent a reset link. Please check your inbox." };
+  if (!EMAIL_RE.test(email)) return res.json(generic);
+  const u = await q.get("SELECT * FROM users WHERE email=?", [email]);
+  if (u) {
+    const cd = rl.cooldown("forgot:" + email, 60e3);
+    if (cd.ok) {
+      const token = newToken();
+      await q.run("UPDATE users SET reset_token=?, reset_sent_at=? WHERE id=?", [token, now(), u.id]);
+      const link = baseUrl(req) + "/reset?token=" + token;
+      await sendPasswordReset({ to: email, name: u.name, link });
+    }
+  }
+  res.json(generic);
+}));
+
+/* ---- Reset page: GET renders a small form that posts the new password ---- */
+app.get("/reset", wrap(async (req, res) => {
+  const token = String(req.query.token || "");
+  const shell = (inner) => `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Reset password · Quietly Here</title><body style="font-family:Segoe UI,Roboto,Arial,sans-serif;background:#F6F1E7;color:#24312B;margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px">
+    <div style="max-width:400px;width:100%;background:#FFFDF8;border:1px solid #E5DCC9;border-radius:18px;padding:30px 26px;box-shadow:0 10px 30px rgba(30,40,33,.08)">${inner}</div></body>`;
+  const valid = token && await q.get("SELECT id, reset_sent_at FROM users WHERE reset_token=?", [token]);
+  const fresh = valid && valid.reset_sent_at && (Date.now() - new Date(valid.reset_sent_at).getTime() < 3600e3);
+  if (!fresh) {
+    return res.status(400).send(shell(`<div style="text-align:center"><div style="font-size:40px">⚠️</div>
+      <h1 style="font-family:Georgia,serif;font-size:22px;margin:10px 0">Link expired</h1>
+      <p style="color:#4C5A53;line-height:1.6;font-size:15px">This reset link is invalid or has expired. Please request a new one from the app.</p>
+      <a href="/" style="display:inline-block;margin-top:16px;background:#155E5A;color:#fff;text-decoration:none;font-weight:700;padding:12px 24px;border-radius:10px">Open Quietly Here</a></div>`));
+  }
+  res.send(shell(`
+    <div style="text-align:center;margin-bottom:14px"><div style="font-size:30px">🔑</div>
+      <h1 style="font-family:Georgia,serif;font-size:22px;margin:8px 0 2px">Choose a new password</h1>
+      <p style="color:#7C877F;font-size:13px;margin:0">At least 6 characters.</p></div>
+    <form id="f" onsubmit="return false" style="display:flex;flex-direction:column;gap:12px">
+      <input id="p1" type="password" placeholder="New password" autocomplete="new-password" style="padding:13px;border:1.5px solid #E5DCC9;border-radius:10px;font-size:15px">
+      <input id="p2" type="password" placeholder="Confirm new password" autocomplete="new-password" style="padding:13px;border:1.5px solid #E5DCC9;border-radius:10px;font-size:15px">
+      <div id="msg" style="font-size:13px;color:#c0392b;min-height:16px"></div>
+      <button id="go" style="background:#155E5A;color:#fff;border:none;font-weight:700;font-size:15px;padding:13px;border-radius:10px;cursor:pointer">Set new password</button>
+    </form>
+    <script>
+      var t=${JSON.stringify(token)};
+      document.getElementById("go").onclick=async function(){
+        var p1=document.getElementById("p1").value, p2=document.getElementById("p2").value, m=document.getElementById("msg");
+        m.style.color="#c0392b";
+        if(p1.length<6){m.textContent="Password must be at least 6 characters.";return;}
+        if(p1!==p2){m.textContent="Passwords don't match.";return;}
+        m.textContent="";
+        try{
+          var r=await fetch("/api/auth/reset",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:t,password:p1})});
+          var j=await r.json();
+          if(!r.ok){m.textContent=j.error||"Something went wrong.";return;}
+          document.getElementById("f").innerHTML='<div style="text-align:center"><div style="font-size:40px">✅</div><h1 style="font-family:Georgia,serif;font-size:20px;margin:10px 0">Password updated</h1><p style="color:#4C5A53;line-height:1.6;font-size:15px">You can now sign in with your new password.</p><a href="/" style="display:inline-block;margin-top:8px;background:#155E5A;color:#fff;text-decoration:none;font-weight:700;padding:12px 24px;border-radius:10px">Open Quietly Here</a></div>';
+        }catch(e){m.textContent="Network error. Please try again.";}
+      };
+    </script>`));
+}));
+
+/* ---- Reset: consume the token and set the new password ---- */
+app.post("/api/auth/reset", wrap(async (req, res) => {
+  const token = String((req.body && req.body.token) || "");
+  const password = String((req.body && req.body.password) || "");
+  if (password.length < 6) return badRequest(res, "Password must be at least 6 characters.");
+  const u = token && await q.get("SELECT id, reset_sent_at FROM users WHERE reset_token=?", [token]);
+  const fresh = u && u.reset_sent_at && (Date.now() - new Date(u.reset_sent_at).getTime() < 3600e3);
+  if (!fresh) return badRequest(res, "This reset link is invalid or has expired. Please request a new one.");
+  const { hash, salt } = hashPassword(password);
+  // set new password, clear the reset token, confirm the account (they proved email ownership),
+  // and log out all existing sessions for safety
+  await q.run("UPDATE users SET pass_hash=?, pass_salt=?, reset_token=NULL, reset_sent_at=NULL, confirmed=1 WHERE id=?", [hash, salt, u.id]);
+  await q.run("DELETE FROM user_sessions WHERE user_id=?", [u.id]);
+  res.json({ ok: true });
+}));
+
 app.post("/api/auth/login", wrap(async (req, res) => {
   const ip = clientIp(req);
   if (rl.isLocked("ulogin:" + ip, 10, 15 * 60e3)) return tooMany(res, 900, "Too many failed sign-in attempts. Please wait 15 minutes.");
@@ -486,6 +566,18 @@ app.get("/api/admin/users", requireAdmin, wrap(async (req, res) => {
     id: Number(r.id), name: r.name, email: r.email, confirmed: !!r.confirmed,
     created_at: r.created_at, stories: Number(r.stories || 0), comments: Number(r.comments || 0)
   })));
+}));
+
+/* Admin sends a personal reply to a member via Resend (no need to open Resend). */
+app.post("/api/admin/users/:id/email", requireAdmin, wrap(async (req, res) => {
+  const u = await q.get("SELECT id,email,name FROM users WHERE id=?", [req.params.id]);
+  if (!u) return res.status(404).json({ error: "Member not found." });
+  const subject = clean(req.body && req.body.subject, 160);
+  const message = clean(req.body && req.body.message, 5000);
+  if (!message) return badRequest(res, "Please write a message.");
+  const r = await sendAdminReply({ to: u.email, name: u.name, subject, message });
+  if (!r.ok) return res.status(502).json({ error: "Couldn't send the email: " + (r.error || "unknown error") });
+  res.json({ ok: true, dev: !!r.dev });
 }));
 
 /* Admin composes and publishes a story directly (goes live immediately). */
