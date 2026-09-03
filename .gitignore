@@ -14,3 +14,9 @@ data/
 .DS_Store
 *.log
 npm-debug.log*
+
+# Never commit signing keys or credential notes
+*.keystore
+*.jks
+README-IMPORTANT.txt
+KEYSTORE-BACKUP.zip

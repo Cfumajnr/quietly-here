@@ -35,15 +35,19 @@ npm start
 # Admin panel: http://localhost:3000/admin
 ```
 
-## Default moderator login
+## Moderator login
+
+The first admin account is seeded on first run from the `ADMIN_USER` / `ADMIN_PASS`
+environment variables. **Set these before the first run** — do not rely on a default.
 
 ```
-username: moderator
-password: quietly2026
+ADMIN_USER=your-admin-username
+ADMIN_PASS=your-strong-password
 ```
 
-Change these before going live by setting environment variables **before the first run**
-(they seed the first admin account):
+If `ADMIN_PASS` is not set, a random one-time password is generated and printed to the
+server log (so there is never a hardcoded/public default). Set the env vars for anything
+beyond a quick local test:
 
 ```bash
 ADMIN_USER=yourname ADMIN_PASS=a-strong-password npm start

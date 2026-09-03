@@ -122,7 +122,9 @@ async function init() {
   const adminCount = Number((await q.get("SELECT COUNT(*) n FROM admins")).n);
   if (adminCount === 0) {
     const username = process.env.ADMIN_USER || "moderator";
-    const password = process.env.ADMIN_PASS || "quietly2026";
+    // No hardcoded default: if ADMIN_PASS is unset, generate a random one-time
+    // password and print it to the log (avoids shipping a public default password).
+    const password = process.env.ADMIN_PASS || require("crypto").randomBytes(9).toString("base64url");
     const { hash, salt } = hashPassword(password);
     await q.run("INSERT INTO admins (username,pass_hash,pass_salt,created_at) VALUES (?,?,?,?)", [username, hash, salt, now()]);
     console.log(`[db] Seeded admin -> username: "${username}"${process.env.ADMIN_PASS ? "" : `  password: "${password}"`}`);

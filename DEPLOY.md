@@ -84,5 +84,5 @@ cd quietly-here-app
 npm install
 npm start          # uses a local file data/quietly.db — no Turso needed
 # Phone app: http://localhost:3000   |   Admin: http://localhost:3000/admin
-# Default login: moderator / quietly2026
+# Admin login: set ADMIN_USER / ADMIN_PASS env vars (if ADMIN_PASS is unset, a random one is printed to the server log on first run)
 ```
