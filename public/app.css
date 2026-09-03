@@ -197,7 +197,7 @@ body{background:radial-gradient(1200px 700px at 20% -10%,#14332F 0%,#0C221F 55%,
 .subcard .sub-row{display:flex;gap:8px}
 .subcard .sub-row input{flex:1;min-width:0;border:1.5px solid var(--line);background:var(--surface);border-radius:12px;padding:11px 13px;font-size:14px;color:var(--ink);font-family:var(--sans);outline:none}
 .subcard .sub-row input:focus{border-color:var(--teal)}
-.subcard .sub-row .btn{flex:0 0 auto;white-space:nowrap}
+.subcard .sub-row .btn{flex:0 0 auto;width:auto;padding-left:16px;padding-right:16px;white-space:nowrap}
 .success{text-align:center;padding:26px 10px}
 .success .big{font-size:44px;margin-bottom:8px}
 .success h3{font-family:var(--serif);margin:0 0 8px;color:var(--ink)}
