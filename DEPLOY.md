@@ -43,6 +43,7 @@ In the service → **Environment** → add:
 | `TURSO_AUTH_TOKEN` | the token from Turso |
 | `CANONICAL_HOST` | `quietly-here.quiettruths.co.ke` (301-redirects the old onrender.com URL here) |
 | `APP_URL` | `https://quietly-here.quiettruths.co.ke` (base for email links & sitemap) |
+| `ADMIN_PATH` | *(optional)* a private path like `/mod-desk-7f3a` — moves the moderator panel off the guessable `/admin` URL |
 
 Save → Render redeploys. You'll get a permanent URL like
 **`https://quietly-here.onrender.com`**:

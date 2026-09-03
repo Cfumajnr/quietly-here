@@ -840,6 +840,17 @@ app.delete("/api/admin/blocks/:id", requireAdmin, wrap(async (req, res) => {
 }));
 
 /* ============================================================
+   ADMIN PANEL ROUTE
+   ============================================================ */
+// The moderator panel lives at /admin by default. Set ADMIN_PATH to a private,
+// unguessable path (e.g. "/mod-desk-7f3a") to move it off the well-known URL so
+// it isn't a sitting target for scanners and brute-force bots. All admin API
+// calls are already auth-gated and login is rate-limited; this just removes the
+// easy-to-guess entry point. The default /admin returns 404 once a custom path
+// is configured.
+const ADMIN_PATH = ("/" + String(process.env.ADMIN_PATH || "admin").replace(/^\/+|\/+$/g, ""));
+
+/* ============================================================
    HEALTH CHECK
    ============================================================ */
 // Cheap liveness probe (no DB hit) for Render's health check and for external
@@ -1015,16 +1026,33 @@ app.get("/", wrap(async (req, res) => {
 // dotfiles:"allow" so /.well-known/assetlinks.json (Digital Asset Links for the Android TWA) is served
 app.use(express.static(path.join(__dirname, "public"), { dotfiles: "allow" }));
 
-// Admin panel: publicly reachable login page, but never cache it (contains a login
-// form) and never allow it to be framed.
-app.get("/admin", (req, res) => {
+// Admin panel: served only at ADMIN_PATH, never cached (contains a login form),
+// and never framed. When a custom path is set, the old /admin is a dead end.
+app.get(ADMIN_PATH, (req, res) => {
   res.set("Cache-Control", "no-store");
   res.sendFile(path.join(__dirname, "public", "admin.html"));
+});
+if (ADMIN_PATH !== "/admin") {
+  app.get("/admin", (req, res) => res.status(404).send("Not found"));
+}
+
+/* Dynamic robots.txt — references the real admin path (and the live sitemap). */
+app.get("/robots.txt", (req, res) => {
+  res.type("text/plain").send(
+`User-agent: *
+Allow: /
+Disallow: ${ADMIN_PATH}
+Disallow: /api/
+Disallow: /reset
+Disallow: /healthz
+
+Sitemap: ${baseUrl(req)}/sitemap.xml
+`);
 });
 
 init().then(() => {
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`[server] Quietly Here running on http://0.0.0.0:${PORT}`);
-    console.log(`[server] Phone app: /   |   Admin panel: /admin`);
+    console.log(`[server] Phone app: /   |   Admin panel: ${ADMIN_PATH}`);
   });
 }).catch((e) => { console.error("[server] Failed to init database:", e); process.exit(1); });
