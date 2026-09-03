@@ -26,7 +26,52 @@ body {
 .screen { transition: background .3s; }
 /* keep content readable on very wide screens (tablet/desktop browser) */
 @media (min-width: 720px) {
+  /* lift app.css's 440px phone cap so the column can center (and grow on desktop) */
+  .phone { max-width: none; }
   .frame { max-width: 460px; margin: 0 auto; border-left: 1px solid var(--line); border-right: 1px solid var(--line); }
+}
+
+/* ---------- desktop (wide screens): a real editorial layout, not a phone ---------- */
+@media (min-width: 900px) {
+  /* Widen the reading column to a comfortable measure and keep the subtle
+     framed look, so it reads as a centered web app rather than a phone strip. */
+  .frame {
+    max-width: 700px;
+    border-left: 1px solid var(--line);
+    border-right: 1px solid var(--line);
+  }
+
+  /* Roomier gutters; re-anchor the full-bleed sticky bars to the new padding. */
+  .view { padding: 6px 28px 116px; }
+  .topbar, .backbar, .rtop { margin-left: -28px; margin-right: -28px; padding-left: 28px; padding-right: 28px; }
+
+  /* Comfortable type scale for a larger canvas. */
+  .article p { font-size: 18.5px; line-height: 1.85; }
+  .card h3 { font-size: 18.5px; }
+  .rtitle { font-size: 31px; }
+  .hero .art { height: 190px; }
+  .rart { height: 200px; }
+  .rart.typo .bigq { font-size: 21px; }
+  .art.typo .bigq { font-size: 18px; }
+
+  /* Bottom nav becomes a centered floating dock — a full-width 3-tab strip
+     stretched across 700px looks odd. */
+  .nav {
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    width: min(400px, 92%);
+    bottom: 16px;
+    border-radius: 22px;
+    border: 1px solid var(--line);
+    box-shadow: 0 12px 34px rgba(30, 40, 33, .16);
+    padding: 8px 10px 10px;
+  }
+
+  /* Give mouse users a visible scroll affordance (hidden on touch devices). */
+  #scrollarea { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+  #scrollarea::-webkit-scrollbar { display: block; width: 10px; }
+  #scrollarea::-webkit-scrollbar-thumb { background: var(--line); border-radius: 8px; }
 }
 .statusbar { display: none; }        /* real phone already has a status bar */
 #scrollarea {
