@@ -249,6 +249,13 @@ function storyCard(s,status){
     <div class="body" data-body>${body}</div>
     <button class="btn ghost sm" data-expand>Read full ▾</button>
     ${s.reject_note?`<div class="muted" style="margin-top:8px">Note: ${esc(s.reject_note)}</div>`:""}
+    ${isPending?`
+      <div class="field" style="margin-top:12px">
+        <label>Meta description <span class="muted">(what Google &amp; link previews show — optional)</span></label>
+        <textarea data-excerpt rows="2" maxlength="200" placeholder="Leave blank to auto-use the story's opening lines">${esc(s.excerpt||"")}</textarea>
+        <div class="muted" data-xcount style="font-size:11px;margin-top:4px">${(s.excerpt||"").length}/200 characters · ~160 recommended for search results</div>
+      </div>
+    `:""}
     <div class="row" style="margin-top:12px">
       ${isPending?`
         <label class="check"><input type="checkbox" data-tough> Mark tough content</label>
@@ -274,7 +281,8 @@ function bindStoryCards(){
     const id = card.dataset.id;
     const q = sel => card.querySelector(sel);
     const exp = q("[data-expand]"); if(exp) exp.onclick=()=>{ q("[data-body]").classList.toggle("open"); exp.textContent = q("[data-body]").classList.contains("open")?"Show less ▴":"Read full ▾"; };
-    const ap = q("[data-approve]"); if(ap) ap.onclick=async()=>{ await api.post(`/api/admin/stories/${id}/approve`,{tough:q("[data-tough]")?.checked, helpline:q("[data-help]")?.checked}); toast("Published ✓"); refreshAll(); };
+    const ap = q("[data-approve]"); if(ap) ap.onclick=async()=>{ const ex = q("[data-excerpt]"); await api.post(`/api/admin/stories/${id}/approve`,{tough:q("[data-tough]")?.checked, helpline:q("[data-help]")?.checked, excerpt:(ex?ex.value:"").trim()}); toast("Published ✓"); refreshAll(); };
+    const ex = q("[data-excerpt]"); if(ex){ const xc=q("[data-xcount]"); const upd=()=>{ if(xc) xc.textContent=`${ex.value.length}/200 characters · ~160 recommended for search results`; }; ex.oninput=upd; }
     const rj = q("[data-reject]"); if(rj) rj.onclick=async()=>{ const note=prompt("Reason (optional, not shown publicly):")||""; await api.post(`/api/admin/stories/${id}/reject`,{note}); toast("Rejected"); refreshAll(); };
     const del = q("[data-delete]"); if(del) del.onclick=async()=>{ if(confirm("Delete this story permanently?")){ await api.del(`/api/admin/stories/${id}`); toast("Deleted"); refreshAll(); } };
     const tt = q("[data-toughtoggle]"); if(tt) tt.onchange=async()=>{ await api.post(`/api/admin/stories/${id}/tough`,{tough:tt.checked}); toast("Updated"); };
@@ -435,6 +443,7 @@ function renderCompose(){
     </div>
     <div class="field"><label>Author / pen name *</label><input id="cx-author" placeholder="e.g. Polepole, or your name"></div>
     <div class="field"><label>Pull quote (optional — the big cover text)</label><input id="cx-pull" placeholder="A short line shown on the cover"></div>
+    <div class="field"><label>Meta description <span class="muted">(Google &amp; link previews — optional)</span></label><input id="cx-excerpt" maxlength="200" placeholder="A one-line summary; leave blank to use the opening lines"></div>
     <div class="field"><label>Story *</label><textarea id="cx-body" rows="12" placeholder="Write the story. Separate paragraphs with a blank line." style="min-height:220px"></textarea>
       <div id="cx-count" style="display:flex;justify-content:space-between;align-items:baseline;margin-top:5px"><b style="font-size:13px;color:var(--ink-soft)">✍️ Start writing…</b><span class="muted">max 5,000</span></div></div>
     <div class="row" style="margin:4px 0 14px">
@@ -458,7 +467,7 @@ function renderCompose(){
     if(wc(body)>5000){ toast("Posts are limited to 5000 words."); return; }
     try {
       await api.post("/api/admin/stories", {
-        title, body, author, pull:g("cx-pull").trim(),
+        title, body, author, pull:g("cx-pull").trim(), excerpt:g("cx-excerpt").trim(),
         topic:g("cx-topic")||"life", lang:g("cx-lang")||"en",
         tough:$("#cx-tough").checked, helpline:$("#cx-help").checked
       });

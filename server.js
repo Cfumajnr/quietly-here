@@ -650,10 +650,22 @@ app.get("/api/admin/stories", requireAdmin, wrap(async (req, res) => {
 
 app.post("/api/admin/stories/:id/approve", requireAdmin, wrap(async (req, res) => {
   const b = req.body || {};
-  const info = await q.run(
-    "UPDATE stories SET status='published', tough=?, helpline=?, published_at=?, reject_note=NULL WHERE id=?",
-    [b.tough ? 1 : 0, b.helpline ? 1 : 0, now(), req.params.id]
-  );
+  // Moderator can hand-tune the meta description (and the cover "pull" line)
+  // right before publishing — this is what Google + link previews will show.
+  const excerpt = clean(b.excerpt, 200).trim();
+  const pull = clean(b.pull, 200).trim();
+  const sets = [
+    "status='published'",
+    "tough=" + (b.tough ? 1 : 0),
+    "helpline=" + (b.helpline ? 1 : 0),
+    "published_at=?",
+    "reject_note=NULL"
+  ];
+  const args = [now()];
+  if (excerpt) { sets.push("excerpt=?"); args.push(excerpt); }
+  if (pull) { sets.push("pull=?"); args.push(pull); }
+  args.push(req.params.id);
+  const info = await q.run(`UPDATE stories SET ${sets.join(", ")} WHERE id=?`, args);
   res.json({ ok: info.changes > 0 });
 }));
 
