@@ -4,7 +4,7 @@
     "target": {
       "namespace": "android_app",
       "package_name": "ke.co.quiettruths.quietlyhere",
-      "sha256_cert_fingerprints": ["PUT_YOUR_SHA256_FINGERPRINT_HERE"]
+      "sha256_cert_fingerprints": ["B0:1F:34:A4:05:28:DD:A6:DD:5D:ED:CE:9A:55:E3:F4:85:F2:70:4E:C1:1E:E5:AD:0B:72:5E:E1:6F:54:AD:A5"]
     }
   }
 ]
