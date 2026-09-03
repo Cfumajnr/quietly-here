@@ -14,7 +14,13 @@ const { createClient } = require("@libsql/client");
 let client;
 if (process.env.TURSO_URL) {
   client = createClient({ url: process.env.TURSO_URL, authToken: process.env.TURSO_AUTH_TOKEN });
-  console.log("[db] Using Turso cloud database.");
+  // Redact any embedded credentials and show token presence, so a misconfigured
+  // deployment (missing/empty token) is obvious in the logs before it 401s.
+  const redacted = String(process.env.TURSO_URL).replace(/\/\/[^@/]*@/, "//***@");
+  console.log("[db] Using Turso cloud database: " + redacted);
+  console.log("[db] TURSO_AUTH_TOKEN: " + (process.env.TURSO_AUTH_TOKEN
+    ? "set (" + String(process.env.TURSO_AUTH_TOKEN).length + " chars)"
+    : "NOT SET — Turso will reject requests with 401"));
 } else {
   const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "data");
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });

@@ -851,11 +851,23 @@ app.delete("/api/admin/blocks/:id", requireAdmin, wrap(async (req, res) => {
 const ADMIN_PATH = ("/" + String(process.env.ADMIN_PATH || "admin").replace(/^\/+|\/+$/g, ""));
 
 /* ============================================================
-   HEALTH CHECK
+   HEALTH CHECKS
    ============================================================ */
-// Cheap liveness probe (no DB hit) for Render's health check and for external
-// uptime monitors (see DEPLOY.md — a free cron ping keeps the free tier warm).
+// Liveness probe (no DB hit) for Render's health check and external uptime
+// monitors (see DEPLOY.md — a free cron ping keeps the free tier warm).
 app.get("/healthz", (req, res) => res.status(200).send("ok"));
+
+// Readiness probe: verifies the database is actually reachable, not just that
+// the process is up. Returns 503 when Turso (or the local file) is down, so you
+// can tell "app up but DB broken" from "everything fine" at a glance.
+app.get("/readyz", wrap(async (req, res) => {
+  try {
+    await q.get("SELECT 1");
+    res.json({ ok: true, db: process.env.TURSO_URL ? "turso" : "local" });
+  } catch (e) {
+    res.status(503).json({ ok: false, db: process.env.TURSO_URL ? "turso" : "local" });
+  }
+}));
 
 /* ============================================================
    SEO: SSR story pages, dynamic sitemap, home fallback
@@ -1045,14 +1057,82 @@ Disallow: ${ADMIN_PATH}
 Disallow: /api/
 Disallow: /reset
 Disallow: /healthz
+Disallow: /readyz
 
 Sitemap: ${baseUrl(req)}/sitemap.xml
 `);
 });
+
+/* ---------- database startup failure: plain-English guidance ---------- */
+// The raw LibsqlError stack trace says almost nothing useful. This maps it to
+// clear instructions (e.g. a Turso 401 means "your token was rejected").
+function httpStatusOf(e) {
+  if (!e) return null;
+  if (typeof e.status === "number") return e.status;
+  if (e.cause && typeof e.cause.status === "number") return e.cause.status;
+  const m = /status\s+(\d{3})/i.exec(String(e.message || "") + " " + String((e.cause && e.cause.message) || ""));
+  return m ? Number(m[1]) : null;
+}
+
+function explainDbError(e) {
+  const status = httpStatusOf(e);
+  const turso = !!process.env.TURSO_URL;
+  const lines = [];
+  if (turso) {
+    const url = String(process.env.TURSO_URL).replace(/\/\/[^@/]*@/, "//***@");
+    lines.push("Database target: Turso (" + url + ")");
+    lines.push("TURSO_AUTH_TOKEN: " + (process.env.TURSO_AUTH_TOKEN ? "set" : "NOT SET"));
+  } else {
+    lines.push("Database target: local file (TURSO_URL not set)");
+  }
+
+  if (status === 401) {
+    lines.push("");
+    lines.push("Turso rejected the database auth token (HTTP 401).");
+    lines.push("The token is invalid for this database. Common causes:");
+    lines.push("  - The token was invalidated or expired (Turso > database > Settings > Invalidate Database Tokens).");
+    lines.push("  - The database was recreated, so the token belongs to a different database id.");
+    lines.push("  - The token belongs to a different database than TURSO_URL points to.");
+    lines.push("");
+    lines.push("Fix: in Turso, create a fresh read-write token for THIS exact database");
+    lines.push("(set expiry to 'Never'), then update TURSO_AUTH_TOKEN in Render");
+    lines.push("> Environment. Confirm TURSO_URL is still correct. Your data is safe in");
+    lines.push("Turso — fixing the token brings it all back.");
+  } else if (status === 404) {
+    lines.push("");
+    lines.push("Turso could not find the database (HTTP 404).");
+    lines.push("Check TURSO_URL — the database may have been renamed or deleted.");
+    lines.push("It should look like libsql://<name>-<org>.<region>.turso.io");
+  } else if (status === 403) {
+    lines.push("");
+    lines.push("Turso denied access (HTTP 403) — the token lacks permission.");
+    lines.push("Recreate the token with read-write (not read-only) access.");
+  } else if (turso) {
+    lines.push("");
+    lines.push("Could not reach or use the Turso database.");
+    lines.push("This is usually a network issue or a transient Turso outage.");
+    lines.push("Check TURSO_URL and TURSO_AUTH_TOKEN are set correctly, then retry.");
+  } else {
+    lines.push("");
+    lines.push("Could not initialise the local SQLite database.");
+    lines.push("Check that the data directory is writable (DATA_DIR).");
+  }
+  return lines.join("\n");
+}
 
 init().then(() => {
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`[server] Quietly Here running on http://0.0.0.0:${PORT}`);
     console.log(`[server] Phone app: /   |   Admin panel: ${ADMIN_PATH}`);
   });
-}).catch((e) => { console.error("[server] Failed to init database:", e); process.exit(1); });
+}).catch((e) => {
+  console.error("");
+  console.error("================================================================");
+  console.error(" Quietly Here failed to start: could not initialise the database.");
+  console.error("================================================================");
+  console.error(explainDbError(e));
+  console.error("");
+  console.error("(raw error: " + (e && e.message ? e.message : String(e)) + ")");
+  console.error("================================================================");
+  process.exit(1);
+});
