@@ -41,6 +41,8 @@ In the service → **Environment** → add:
 | `ADMIN_PASS` | a strong password |
 | `TURSO_URL` | the `libsql://…` URL from Turso |
 | `TURSO_AUTH_TOKEN` | the token from Turso |
+| `CANONICAL_HOST` | `quietly-here.quiettruths.co.ke` (301-redirects the old onrender.com URL here) |
+| `APP_URL` | `https://quietly-here.quiettruths.co.ke` (base for email links & sitemap) |
 
 Save → Render redeploys. You'll get a permanent URL like
 **`https://quietly-here.onrender.com`**:
@@ -51,7 +53,11 @@ Save → Render redeploys. You'll get a permanent URL like
 Data now lives in Turso, so it survives restarts, sleeps, and redeploys.
 
 > **Free-tier note:** the Render free service sleeps after ~15 min idle and wakes on the
-> next visit (first load ~30s). The data is safe in Turso regardless. Upgrade later for always-on.
+> next visit (first load can be slow). The data is safe in Turso regardless. To keep it
+> warm for free, point a free uptime monitor (e.g. **UptimeRobot** or **cron-job.org**) at
+> `https://<your-host>/healthz` every 5 minutes — the periodic ping stops the service from
+> ever sleeping, so real visitors never hit a cold start. Upgrade to a paid Render plan for
+> true always-on.
 
 ---
 

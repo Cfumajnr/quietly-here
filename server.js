@@ -29,6 +29,30 @@ app.use((req, res, next) => {
   next();
 });
 
+/* ---------- security headers (applied to every response) ---------- */
+app.use((req, res, next) => {
+  res.set("X-Content-Type-Options", "nosniff");
+  res.set("X-Frame-Options", "DENY");
+  res.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.set("Permissions-Policy", "geolocation=(), microphone=(), camera=(), payment=()");
+  res.set("Cross-Origin-Opener-Policy", "same-origin");
+  // The app uses inline scripts/styles (reset page, admin panel, PWA boot), so
+  // 'unsafe-inline' is required for script-src/style-src. We still lock down
+  // everything else (no third-party frames, no plugins, self-origin only).
+  res.set("Content-Security-Policy",
+    "default-src 'self'; " +
+    "script-src 'self' 'unsafe-inline'; " +
+    "style-src 'self' 'unsafe-inline'; " +
+    "img-src 'self' data:; " +
+    "font-src 'self' data:; " +
+    "connect-src 'self'; " +
+    "object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'");
+  if (isHttps(req)) {
+    res.set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
+  }
+  next();
+});
+
 app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
 
@@ -66,6 +90,35 @@ const LIMITS = {
   story:      { min: 50, max: 3000 },  // user submissions
   adminStory: { min: 1,  max: 5000 }   // admin-composed posts
 };
+
+/* ---------- SEO / URL / cookie helpers ---------- */
+// "The War That Wasn't About the Ugali" -> "the-war-that-wasn-t-about-the-ugali"
+const slugify = (s) => String(s || "")
+  .toLowerCase()
+  .replace(/[\u2019']/g, "")
+  .replace(/[^a-z0-9]+/g, "-")
+  .replace(/^-+|-+$/g, "")
+  .slice(0, 90) || "story";
+
+// Stable, human- and crawler-friendly story URL: "/story/12-the-strong-one-..."
+// (the leading numeric id keeps slugs collision-free; the rest is for readers/SEO)
+const storySlug = (row) => `${row.id}-${slugify(row.title)}`;
+const storyPath = (row) => "/story/" + storySlug(row);
+const storyHref = (req, row) => baseUrl(req) + storyPath(row);
+
+// Extract a numeric story id from a /story/... path segment ("12-foo" or "12").
+const storyIdFromPath = (seg) => {
+  const m = /^(\d+)/.exec(String(seg || ""));
+  return m ? Number(m[1]) : null;
+};
+
+const isHttps = (req) =>
+  req.secure === true || (req.headers["x-forwarded-proto"] || "").split(",")[0].trim() === "https";
+
+// Auth cookies: httpOnly + lax by default; add `secure` when served over HTTPS
+// (always true behind Render/Cloudflare), so the flag is never accidentally
+// stripped by a local http dev server.
+const cookieOpts = (req, maxAge) => ({ httpOnly: true, sameSite: "lax", secure: isHttps(req), maxAge });
 
 function storyToClient(row, { includePrivate = false } = {}) {
   const out = {
@@ -332,7 +385,7 @@ app.get("/api/auth/confirm", wrap(async (req, res) => {
   // sign them in immediately
   const stoken = newToken();
   await q.run("INSERT INTO user_sessions (token,user_id,created_at) VALUES (?,?,?)", [stoken, u.id, now()]);
-  res.cookie("qh_user", stoken, { httpOnly: true, sameSite: "lax", maxAge: 60 * 24 * 3600 * 1000 });
+  res.cookie("qh_user", stoken, cookieOpts(req, 60 * 24 * 3600 * 1000));
   res.send(page("Email confirmed!", "Your account is ready. Welcome to Quietly Here — you're now signed in.", true));
 }));
 
@@ -444,7 +497,7 @@ app.post("/api/auth/login", wrap(async (req, res) => {
   if (!u.confirmed) return res.status(403).json({ error: "Please confirm your email first — check your inbox.", needConfirm: true, email });
   const token = newToken();
   await q.run("INSERT INTO user_sessions (token,user_id,created_at) VALUES (?,?,?)", [token, u.id, now()]);
-  res.cookie("qh_user", token, { httpOnly: true, sameSite: "lax", maxAge: 60 * 24 * 3600 * 1000 });
+  res.cookie("qh_user", token, cookieOpts(req, 60 * 24 * 3600 * 1000));
   res.json({ ok: true, user: userToClient(u) });
 }));
 
@@ -553,7 +606,7 @@ app.post("/api/admin/login", wrap(async (req, res) => {
   rl.clearFails("login:" + ip);
   const token = newToken();
   await q.run("INSERT INTO sessions (token,admin_id,created_at) VALUES (?,?,?)", [token, admin.id, now()]);
-  res.cookie("qh_admin", token, { httpOnly: true, sameSite: "lax", maxAge: 7 * 24 * 3600 * 1000 });
+  res.cookie("qh_admin", token, cookieOpts(req, 7 * 24 * 3600 * 1000));
   res.json({ ok: true, username: admin.username });
 }));
 
@@ -684,7 +737,7 @@ app.post("/api/admin/stories/:id/notify", requireAdmin, wrap(async (req, res) =>
   if (story.status !== "published") return badRequest(res, "Only published stories can be sent to subscribers.");
   const subs = await q.all("SELECT email, unsub_token FROM subscribers WHERE confirmed=1");
   if (!subs.length) return res.json({ ok: true, sent: 0, message: "No confirmed subscribers yet." });
-  const url = baseUrl(req) + "/?story=" + Number(story.id);
+  const url = storyHref(req, story);
   let sent = 0, failed = 0, dev = false;
   for (const s of subs) {
     const unsubUrl = baseUrl(req) + "/api/unsubscribe?token=" + (s.unsub_token || "");
@@ -775,12 +828,187 @@ app.delete("/api/admin/blocks/:id", requireAdmin, wrap(async (req, res) => {
 }));
 
 /* ============================================================
-   STATIC + ROUTES
+   HEALTH CHECK
    ============================================================ */
+// Cheap liveness probe (no DB hit) for Render's health check and for external
+// uptime monitors (see DEPLOY.md — a free cron ping keeps the free tier warm).
+app.get("/healthz", (req, res) => res.status(200).send("ok"));
+
+/* ============================================================
+   SEO: SSR story pages, dynamic sitemap, home fallback
+   ============================================================ */
+const escHtml = (s) => String(s == null ? "" : s)
+  .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+  .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+
+const TOPIC_NAMES = {
+  life:    { en: "Life",    sw: "Maisha" },
+  people:  { en: "People",  sw: "Watu" },
+  moments: { en: "Moments", sw: "Nyakati" },
+  hope:    { en: "Hope",    sw: "Tumaini" }
+};
+const topicName = (k, lang) => (TOPIC_NAMES[k] ? TOPIC_NAMES[k][lang] : k);
+
+const SITE_TITLE = "Quietly Here — Real Kenyan stories, told quietly";
+const SITE_DESC = "A safe space to read and share real, anonymous Kenyan stories in English and Kiswahili. Read in silence. Speak without judgment.";
+const OG_IMAGE = "/icon-512.png";
+
+// App shell (read once from disk, reused for home injection and story 404s).
+let indexTemplate = null;
+const homeTemplate = () => indexTemplate || (indexTemplate = require("fs").readFileSync(path.join(__dirname, "public", "index.html"), "utf8"));
+
+/* Full, self-contained HTML page for a single story. Server-rendered so search
+   engines and social scrapers (WhatsApp/Facebook/X) see the real title, text and
+   image — the SPA shell alone showed only "Loading…". Humans opening a shared link
+   get the story instantly (no cold-start spinner) plus an "open in app" button for
+   comments/reactions. */
+function renderStoryPage(req, row) {
+  const id = Number(row.id);
+  const lang = row.lang === "sw" ? "sw" : "en";
+  // `title` is the authored title in the story's native language; `title_alt`
+  // is the alternate-language translation shown by the in-app toggle.
+  const title = row.title;
+  const excerpt = row.excerpt || "";
+  const pull = row.pull || "";
+  const paragraphs = (row.body || "").split("\n\n").filter(Boolean);
+  const url = storyHref(req, row);
+  const imgUrl = baseUrl(req) + OG_IMAGE;
+  const date = (row.published_at || row.created_at || "").slice(0, 10);
+  const topic = row.topic;
+
+  const jsonld = {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: title,
+    description: excerpt,
+    image: imgUrl,
+    author: { "@type": "Person", name: row.author },
+    publisher: { "@type": "Organization", name: "Quietly Here" },
+    datePublished: row.published_at || row.created_at,
+    inLanguage: lang === "sw" ? "sw" : "en",
+    mainEntityOfPage: url
+  };
+
+  const paras = paragraphs.map((p) => `<p>${escHtml(p)}</p>`).join("\n");
+
+  return `<!doctype html>
+<html lang="${lang}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#155E5A">
+<title>${escHtml(title)} · Quietly Here</title>
+<meta name="description" content="${escHtml(excerpt)}">
+<link rel="canonical" href="${escHtml(url)}">
+<meta name="robots" content="index, follow">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Quietly Here">
+<meta property="og:title" content="${escHtml(title)}">
+<meta property="og:description" content="${escHtml(excerpt)}">
+<meta property="og:url" content="${escHtml(url)}">
+<meta property="og:image" content="${escHtml(imgUrl)}">
+<meta property="og:locale" content="${lang === "sw" ? "sw_KE" : "en_KE"}">
+<meta property="article:published_time" content="${escHtml(row.published_at || row.created_at)}">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="${escHtml(title)}">
+<meta name="twitter:description" content="${escHtml(excerpt)}">
+<meta name="twitter:image" content="${escHtml(imgUrl)}">
+<script type="application/ld+json">${JSON.stringify(jsonld)}</script>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #F6F1E7; color: #24312B; font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; line-height: 1.75; }
+  .wrap { max-width: 680px; margin: 0 auto; padding: 20px 20px 60px; }
+  header.top { display: flex; align-items: center; justify-content: space-between; padding: 8px 0 24px; border-bottom: 1px solid #E5DCC9; margin-bottom: 28px; }
+  .brand { font-family: Georgia, serif; font-size: 20px; color: #155E5A; text-decoration: none; font-weight: 700; }
+  .brand small { display: block; font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; font-size: 11px; color: #7C877F; font-weight: 400; letter-spacing: .03em; }
+  .badge { display: inline-block; font-size: 12px; font-weight: 700; letter-spacing: .04em; color: #155E5A; background: #E3EFEC; border-radius: 999px; padding: 4px 12px; }
+  h1 { font-family: Georgia, serif; font-size: 30px; line-height: 1.25; margin: 16px 0 10px; }
+  .meta { color: #7C877F; font-size: 14px; margin: 0 0 6px; }
+  .pull { font-family: Georgia, serif; font-style: italic; font-size: 19px; color: #155E5A; border-left: 4px solid #155E5A; padding: 4px 0 4px 18px; margin: 22px 0; }
+  .body p { margin: 0 0 20px; font-size: 17px; }
+  .notice { background: #FDF3E7; border: 1px solid #EAD9BE; color: #7A5A20; border-radius: 12px; padding: 12px 16px; font-size: 14px; margin: 20px 0; }
+  .cta { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 28px; }
+  .btn { display: inline-block; background: #155E5A; color: #fff; text-decoration: none; font-weight: 700; padding: 13px 26px; border-radius: 10px; }
+  .btn.ghost { background: transparent; color: #155E5A; border: 1.5px solid #155E5A; }
+  footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #E5DCC9; color: #9AA49D; font-size: 13px; }
+  a { color: #155E5A; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="brand" href="/">Quietly Here<small>Real Kenyan stories, told quietly</small></a>
+    <span class="badge">${escHtml(topicName(topic, lang))}</span>
+  </header>
+  <h1>${escHtml(title)}</h1>
+  <p class="meta">By ${escHtml(row.author)} · ${escHtml(date)} · ${Number(row.mins) || 3} min read</p>
+  ${pull ? `<blockquote class="pull">${escHtml(pull)}</blockquote>` : ""}
+  ${row.tough ? `<div class="notice">This story contains tough content and may be difficult for some readers.</div>` : ""}
+  <div class="body">${paras}</div>
+  ${row.helpline ? `<div class="notice">If this story raised anything for you, crisis helplines are available inside the app.</div>` : ""}
+  <div class="cta">
+    <a class="btn" href="/?story=${id}">Read &amp; comment in the app</a>
+    <a class="btn ghost" href="/">More stories</a>
+  </div>
+  <footer>Quietly Here · Read in silence. Speak without judgment.</footer>
+</div>
+</body>
+</html>`;
+}
+
+/* Dynamic sitemap: the homepage plus every published story (clean /story/slug URLs). */
+app.get("/sitemap.xml", wrap(async (req, res) => {
+  const rows = await q.all("SELECT id, title, published_at, created_at FROM stories WHERE status='published' ORDER BY id ASC");
+  const base = baseUrl(req);
+  const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const urls = [`  <url><loc>${esc(base)}/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>`];
+  for (const r of rows) {
+    const lastmod = (r.published_at || r.created_at || "").slice(0, 10);
+    urls.push(`  <url><loc>${esc(base + storyPath(r))}</loc>${lastmod ? `<lastmod>${lastmod}</lastmod>` : ""}</url>`);
+  }
+  res.type("application/xml").send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join("\n")}\n</urlset>\n`);
+}));
+
+/* Single story as clean, crawlable HTML. Accepts "/story/12", "/story/12-slug",
+   or an outdated "/story/old-slug". Falls through to the SPA for unknown ids. */
+app.get("/story/:seg", wrap(async (req, res) => {
+  const id = storyIdFromPath(req.params.seg);
+  const row = id ? await q.get("SELECT * FROM stories WHERE id=? AND status='published'", [id]) : null;
+  if (!row) {
+    // Unknown/removed story: 404 for crawlers, but serve the app shell so a human
+    // with a stale shared link lands in the app (which shows "story not found").
+    return res.status(404).type("html").send(homeTemplate());
+  }
+  res.type("html").send(renderStoryPage(req, row));
+}));
+
+/* Home: serve the app shell but inject (a) a <noscript> list of published stories
+   so crawlers without JS still see links/content, and (b) a JSON preload the SPA
+   uses to paint instantly instead of showing "Loading…". */
+app.get("/", wrap(async (req, res) => {
+  const rows = await q.all("SELECT * FROM stories WHERE status='published' ORDER BY COALESCE(published_at, created_at) DESC");
+  const stories = rows.map(storyToClient);
+  const links = rows.map((r) =>
+    `<li><a href="${escHtml(storyPath(r))}">${escHtml(r.title)}</a> — ${escHtml(r.excerpt || "")}</li>`
+  ).join("\n");
+  const noscript = `<noscript><div style="max-width:640px;margin:0 auto;padding:24px;font-family:Georgia,serif;color:#24312B">
+    <h1 style="color:#155E5A">Quietly Here</h1><p>Real Kenyan stories, told quietly. Read in silence. Speak without judgment.</p>
+    <ul>${links}</ul></div></noscript>`;
+  const preload = `<script>window.__PRELOAD_STORIES__=${JSON.stringify(stories)};</script>`;
+  const html = homeTemplate().replace("</body>", preload + noscript + "</body>");
+  res.type("html").send(html);
+}));
+
 // dotfiles:"allow" so /.well-known/assetlinks.json (Digital Asset Links for the Android TWA) is served
 app.use(express.static(path.join(__dirname, "public"), { dotfiles: "allow" }));
-app.get("/admin", (req, res) => res.sendFile(path.join(__dirname, "public", "admin.html")));
-app.get("/", (req, res) => res.sendFile(path.join(__dirname, "public", "index.html")));
+
+// Admin panel: publicly reachable login page, but never cache it (contains a login
+// form) and never allow it to be framed.
+app.get("/admin", (req, res) => {
+  res.set("Cache-Control", "no-store");
+  res.sendFile(path.join(__dirname, "public", "admin.html"));
+});
 
 init().then(() => {
   app.listen(PORT, "0.0.0.0", () => {

@@ -472,7 +472,11 @@ function topbarHTML(markEmoji, titleText) {
 async function renderHome() {
   scrollEl().innerHTML = `<div class="view"><div class="loading">${tt("latest")}…</div></div>`;
   let stories = [];
-  try { stories = await api.get("/api/stories?sort=new"); } catch (e) { return renderError(e); }
+  // Server preloads the latest stories into the HTML so the home page paints
+  // instantly (and crawlers see it). Use it once, then fetch fresh thereafter.
+  try { stories = window.__PRELOAD_STORIES__ || await api.get("/api/stories?sort=new"); }
+  catch (e) { return renderError(e); }
+  try { delete window.__PRELOAD_STORIES__; } catch (e) {}
   // saved stories live in the Library, not the feed — keep them out of Home
   stories = stories.filter(s => !state.saved.includes(s.id));
   state.homeStories = stories;
@@ -1045,7 +1049,7 @@ document.addEventListener("click", async e => {
     case "slang": state.searchLang = el.dataset.v; renderSearch(); break;
     case "sort": state.searchSort = el.value; renderResults(); break;
     case "libtab": state.libTab = el.dataset.v; renderLibrary(); break;
-    case "toggle-lang": state.lang = state.lang === "en" ? "sw" : "en"; lsSet("qh.lang", state.lang); rerender(); closeDrawer(); break;
+    case "toggle-lang": state.lang = state.lang === "en" ? "sw" : "en"; lsSet("qh.lang", state.lang); syncDocLang(); rerender(); closeDrawer(); break;
     case "toggle-dark": state.dark = !state.dark; lsSet("qh.dark", state.dark); applyDark(); rerender(); break;
     case "toggle-save": {
       requireAuth(tt("gateSave"), () => {
@@ -1284,10 +1288,18 @@ function removeFromFeeds(id) {
   state.searchStories = state.searchStories.filter(s => s.id !== id);
   state.topicStories = state.topicStories.filter(s => s.id !== id);
 }
-/* canonical, shareable URL for a story (deep link handled at boot) */
+/* canonical, shareable URL for a story: "/story/12-the-strong-one-..."
+   Clean, readable and crawlable (the server renders these for SEO). */
+const slugify = (s) => String(s || "")
+  .toLowerCase()
+  .replace(/[\u2019']/g, "")
+  .replace(/[^a-z0-9]+/g, "-")
+  .replace(/^-+|-+$/g, "")
+  .slice(0, 90) || "story";
+
 function storyUrl(s) {
   const base = location.origin + location.pathname.replace(/index\.html?$/, "");
-  return base + "?story=" + (s && s.id != null ? s.id : "");
+  return base + "/story/" + (s && s.id != null ? s.id : "") + "-" + slugify(s && s.title ? s.title : "");
 }
 function shareText(s) {
   const title = s ? storyTitle(s) : "Quietly Here";
@@ -1482,12 +1494,21 @@ applyDark();
 try { history.replaceState({ qh: "root" }, ""); history.pushState({ qh: true }, ""); } catch (e) {}
 booted = true;
 go("home");
-// deep link: /?story=ID opens that story directly (used by shared links)
+// deep link: /?story=ID (legacy) or /story/12-slug (clean share URLs) open that
+// story directly. The leading numeric id is all we need to load the reader.
 (function openDeepLink() {
   try {
     const sid = new URLSearchParams(location.search).get("story");
-    if (sid && /^\d+$/.test(sid)) go("reader", { readerId: +sid });
+    if (sid && /^\d+$/.test(sid)) return go("reader", { readerId: +sid });
+    const m = /^\/story\/(\d+)/.exec(location.pathname);
+    if (m) go("reader", { readerId: +m[1] });
   } catch (e) {}
 })();
+// keep the document's lang attribute in sync with the in-app language toggle
+// (helps screen readers announce Kiswahili content correctly)
+function syncDocLang() {
+  try { document.documentElement.setAttribute("lang", state.lang === "sw" ? "sw" : "en"); } catch (e) {}
+}
+syncDocLang();
 // load any existing session, then refresh the current view so account UI shows
 refreshUser().then(() => { if (state.user) rerender(); });

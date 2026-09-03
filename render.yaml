@@ -13,8 +13,13 @@ services:
     plan: free
     buildCommand: npm install
     startCommand: npm start
+    healthCheckPath: /healthz
     envVars:
       - key: ADMIN_USER
         sync: false          # you set this in the Render dashboard
       - key: ADMIN_PASS
         sync: false          # you set this in the Render dashboard
+      - key: CANONICAL_HOST
+        sync: false          # e.g. quietly-here.quiettruths.co.ke — 301-redirects other hosts (old onrender.com URL) to this
+      - key: APP_URL
+        sync: false          # e.g. https://quietly-here.quiettruths.co.ke — base for links in emails & sitemap; falls back to request host if unset
