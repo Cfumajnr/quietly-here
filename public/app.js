@@ -164,7 +164,7 @@ const I18N = {
     helpTitle:"Get help",
     helpSub:"Quietly Here is a story app, not a clinic — but you are never alone.",
     hMission:"Our mission", hMissionB:"We publish real stories about real Kenyan life — so no one carries their struggles in silence.",
-    hRules:"Community rules", r1:"Be kind — this is a judgment-free space.", r2:"No bullying, hate speech or shaming.", r3:"No spam or self-promotion.", r4:"If someone is hurting, point them to help — not debate.", r5:"Report, don't fight back.",
+    hRules:"Community rules", r1:"Be respectful. Everyone here is sharing something personal — treat people with dignity, even when you disagree.", r2:"No hate, harassment, or bullying. No attacks based on tribe, race, religion, gender, sexuality, disability, or any identity. No threats or intimidation.", r3:"Protect people's privacy. Never share someone's real name, photo, contact details, or other identifying information without their consent.", r4:"No graphic or explicit content. No sexual material, gore, or graphic violence. Difficult stories may be marked as tough content with helplines attached.", r5:"Self-harm and suicide are taken seriously. Sharing your own experience to seek support is welcome — but nothing that encourages, glorifies, or instructs self-harm or suicide. If you are struggling, use the helplines above.", r6:"No spam, scams, or self-promotion. No advertising, fundraising, or links posted to drive traffic.", r7:"No illegal content or harmful misinformation. Do not present false claims — especially about health — as fact.", r8:"Report, don't retaliate. If something breaks these rules, report it and let the moderators handle it.",
     hCrisis:"If you are in crisis right now", hCrisisB:"These services are free, confidential and ready to listen. You are not a burden.",
     hReport:"Report abuse", hReportB:"Every comment has a report button. Our moderator reviews reports and blocks repeat offenders — by nickname, device and IP.",
     hContact:"Contact us", hContactB:"Reach the moderator directly — we reply within a day.",
@@ -189,14 +189,17 @@ const I18N = {
     aboutSafe:"A safe space", aboutSafeB:"This is a judgment-free community. We remove bullying, hate and spam, and we point people who are hurting toward real help. You can read freely without an account; a free account lets you save stories, submit your own writing and report anything harmful.",
     aboutTeam:"Who runs it", aboutTeamB:"Quietly Here is a small, independent project based in Nairobi, Kenya. Reach us any time through the Contact page.",
     termsTitle:"Terms & Privacy",
-    termsUpdated:"Last updated: 2 September 2026",
-    termsIntro:"Please read these terms. By creating an account or using Quietly Here, you agree to them.",
-    t1h:"1. Using Quietly Here", t1b:"Quietly Here is a platform for reading and sharing personal stories. It is not a substitute for professional medical, legal or mental-health advice. If you are in crisis, please use the helplines on the Get Help page.",
-    t2h:"2. Your account", t2b:"You must give a valid email to create an account and confirm it before you can save stories, submit writing or report comments. Keep your password private. You are responsible for activity on your account. You must be 18 or older, or have a guardian's consent.",
-    t3h:"3. What you post", t3b:"You keep ownership of what you write. By submitting a story or comment, you give Quietly Here permission to publish, lightly edit and translate it. Do not post anything that is false, hateful, harassing, that infringes someone's rights, or that shares another person's private details without consent.",
-    t4h:"4. Moderation", t4b:"Every story is reviewed before publishing. We may edit, decline, hide or remove content, and block users — by nickname, device or IP — to keep the community safe. Reporting abuse is encouraged; misusing reports is not.",
-    t5h:"5. Privacy", t5b:"We collect only what we need: your name and email (for accounts), the content you post, and basic technical data (device identifier and IP address) used to prevent spam and abuse. We do not sell your data. Confirmation emails are sent through our email provider. You can request deletion of your data at any time via the Contact page.",
-    t6h:"6. Changes", t6b:"We may update these terms. Continued use after an update means you accept the new terms. Questions? Reach us through the Contact page.",
+    termsUpdated:"Last updated: 3 September 2026",
+    termsIntro:"Please read these terms carefully before using Quietly Here. By creating an account or using the platform, you agree to be bound by them. If you do not agree, please do not use the service.",
+    t1h:"1. About Quietly Here", t1b:"Quietly Here is a platform for reading and sharing personal stories. It is not a substitute for professional medical, legal, financial, or mental-health advice. If you are in crisis or at risk of harm, contact the helplines on the Get Help page or emergency services immediately.",
+    t2h:"2. Eligibility and accounts", t2b:"You must be at least 18 years old, or have the consent of a parent or guardian, to use Quietly Here. You must provide a valid email address and confirm it before you can save stories, submit writing, or report content. You are responsible for keeping your password confidential and for all activity on your account. Notify us immediately if you believe your account has been compromised.",
+    t3h:"3. Your content and the licence you grant", t3b:"You retain ownership of what you write. By submitting a story or comment, you grant Quietly Here a non-exclusive, worldwide, royalty-free licence to publish, display, lightly edit, and translate it, and to use it to operate and promote the platform. You confirm that your content does not breach these terms or anyone else's rights.",
+    t4h:"4. Prohibited content", t4b:"You must not post anything that is unlawful, defamatory, hateful, harassing, threatening, obscene, or sexually explicit; that promotes self-harm, suicide, violence, or illegal activity; that infringes another person's copyright or privacy; or that contains spam, scams, or advertising. Please read the Community Rules on the Get Help page.",
+    t5h:"5. Moderation and removal", t5b:"Every story is reviewed before publication. We may edit, decline, hide, or remove any content, and suspend or block users — by nickname, device, or IP address — where we consider it necessary to protect the community. We report content to the authorities where the law requires it. Misusing the reporting system is itself a violation of these terms.",
+    t6h:"6. Privacy and your data", t6b:"We collect only what we need to run the service: your name and email address (for accounts), the content you post, and limited technical data (device identifier and IP address) used to prevent spam and abuse. We do not sell your data, and we do not share it with third parties except our email and hosting providers as necessary to operate the service. You may request deletion of your data at any time via the Contact page.",
+    t7h:"7. Disclaimer and limitation of liability", t7b:"Quietly Here is provided \"as is\" and \"as available\", without warranties of any kind. To the fullest extent permitted by law, we are not liable for any indirect, incidental, or consequential loss arising from your use of the platform, including any reliance on content posted by other users. Stories reflect their authors' views, not ours.",
+    t8h:"8. Changes to these terms", t8b:"We may update these terms from time to time. We will post the revised version with an updated date. Your continued use of the platform after any change means you accept the revised terms. If you do not agree, you should stop using the service.",
+    t9h:"9. Contact", t9b:"Questions or concerns about these terms, or requests to delete your data, can be sent through the Contact page.",
     agreeTerms:"I have read and agree to the", agreeTermsLink:"Terms & Privacy",
     mustAgree:"Please agree to the Terms & Privacy to create an account.",
     readTerms:"Read the Terms & Privacy",
@@ -329,7 +332,7 @@ const I18N = {
     helpTitle:"Pata msaada",
     helpSub:"Quietly Here ni app ya hadithi, si kliniki — lakini huwa wewe si peke yako.",
     hMission:"Dhamira yetu", hMissionB:"Tunachapisha hadithi za kweli kuhusu maisha ya Kikenya — ili hakuna mtu anayebeba taabu zake kimya kimya.",
-    hRules:"Sheria za jumuiya", r1:"Kuwa mwema — hii ni nafasi isiyo na hukumu.", r2:"Hakuna unyanyasaji, chuki wala kuaibisha.", r3:"Hakuna spam wala kujitangaza.", r4:"Mtu akiumia, mwelekeze kwenye msaada — si mabishano.", r5:"Ripoti, usipigane nyuma.",
+    hRules:"Sheria za jumuiya", r1:"Kuwa na heshima. Kila mtu hapa anashiriki jambo la binafsi — watendee watu kwa heshima, hata unapotofautiana maoni.", r2:"Hakuna chuki, unyanyasaji, wala uonevu. Hakuna mashambulizi kwa msingi wa kabila, rangi, dini, jinsia, ulemavu, au utambulisho wowote. Hakuna vitisho wala utishaji.", r3:"Linda faragha ya watu. Usiwahi kushiriki jina halisi, picha, mawasiliano, au taarifa nyingine za kumtambulisha mtu bila ridhaa yake.", r4:"Hakuna maudhui ya kuchukiza wala ya wazi. Hakuna maudhui ya ngono, damu, wala vurugu ya kutisha. Hadithi ngumu zinaweza kuwekwa alama ya maudhui magumu pamoja na nambari za msaada.", r5:"Kujiumiza na kujiua huchukuliwa kwa uzito. Kushiriki uzoefu wako kutafuta msaada kunakaribishwa — lakini si chochote kinachohamasisha, kutukuza, au kuelekeza kujiumiza au kujiua. Ukiwa unapambana, tumia nambari za msaada hapo juu.", r6:"Hakuna spam, ulaghai, wala kujitangaza. Hakuna matangazo, uchangishaji, wala viungo vya kuvutia watu.", r7:"Hakuna maudhui haramu wala taarifa potofu. Usiwasilishe madai ya uongo — hasa kuhusu afya — kama ukweli.", r8:"Ripoti, usilipize kisasi. Kitu kinapokiuka sheria hizi, kiripoti na waache wasimamizi washughulikie.",
     hCrisis:"Ikiwa uko kwenye hatari sasa hivi", hCrisisB:"Huduma hizi ni bure, za siri na ziko tayari kukusikiliza. Wewe si mzigo.",
     hReport:"Ripoti unyanyasaji", hReportB:"Kila maoni yana kitufe cha ripoti. Msimamizi anakagua ripoti na kufunga wanaokiuka — kwa jina, kifaa na IP.",
     hContact:"Wasiliana nasi", hContactB:"Mfikie msimamizi moja kwa moja — tunajibu ndani ya siku moja.",
@@ -354,14 +357,17 @@ const I18N = {
     aboutSafe:"Nafasi salama", aboutSafeB:"Hii ni jumuiya isiyo na hukumu. Tunaondoa unyanyasaji, chuki na spam, na tunawaelekeza wanaoumia kwenye msaada halisi. Unaweza kusoma bila akaunti; akaunti ya bure hukuwezesha kuhifadhi hadithi, kutuma maandishi yako na kuripoti chochote chenye madhara.",
     aboutTeam:"Nani anayeendesha", aboutTeamB:"Quietly Here ni mradi mdogo, huru ulioko Nairobi, Kenya. Tufikie wakati wowote kupitia ukurasa wa Wasiliana.",
     termsTitle:"Masharti & Faragha",
-    termsUpdated:"Yamesasishwa: 2 Septemba 2026",
-    termsIntro:"Tafadhali soma masharti haya. Kwa kuunda akaunti au kutumia Quietly Here, unayakubali.",
-    t1h:"1. Kutumia Quietly Here", t1b:"Quietly Here ni jukwaa la kusoma na kushiriki hadithi za binafsi. Si mbadala wa ushauri wa kitaalamu wa matibabu, kisheria au afya ya akili. Ikiwa uko kwenye hatari, tafadhali tumia nambari za msaada kwenye ukurasa wa Pata Msaada.",
-    t2h:"2. Akaunti yako", t2b:"Lazima utoe barua pepe halali kuunda akaunti na kuithibitisha kabla ya kuhifadhi hadithi, kutuma maandishi au kuripoti maoni. Weka nenosiri lako siri. Wewe ni mwajibikaji wa shughuli kwenye akaunti yako. Lazima uwe na miaka 18 au zaidi, au uwe na ruhusa ya mlezi.",
-    t3h:"3. Unachochapisha", t3b:"Unabaki na umiliki wa unachoandika. Kwa kutuma hadithi au maoni, unampa Quietly Here ruhusa ya kuchapisha, kuhariri kidogo na kutafsiri. Usichapishe chochote cha uongo, chuki, unyanyasaji, kinachokiuka haki za mtu, au kinachoshiriki maelezo binafsi ya mtu mwingine bila ridhaa.",
-    t4h:"4. Usimamizi", t4b:"Kila hadithi hukaguliwa kabla ya kuchapishwa. Tunaweza kuhariri, kukataa, kuficha au kuondoa maudhui, na kuzuia watumiaji — kwa jina, kifaa au IP — ili kulinda jumuiya. Kuripoti unyanyasaji kunahimizwa; kutumia vibaya ripoti hakukubaliki.",
-    t5h:"5. Faragha", t5b:"Tunakusanya tu tunachohitaji: jina lako na barua pepe (kwa akaunti), maudhui unayochapisha, na data ya kimsingi ya kiufundi (kitambulisho cha kifaa na anwani ya IP) inayotumika kuzuia spam na unyanyasaji. Hatuuzii data yako. Barua pepe za uthibitisho hutumwa kupitia mtoa huduma wetu wa barua pepe. Unaweza kuomba kufutwa kwa data yako wakati wowote kupitia ukurasa wa Wasiliana.",
-    t6h:"6. Mabadiliko", t6b:"Tunaweza kusasisha masharti haya. Kuendelea kutumia baada ya sasisho kunamaanisha unakubali masharti mapya. Maswali? Tufikie kupitia ukurasa wa Wasiliana.",
+    termsUpdated:"Yamesasishwa: 3 Septemba 2026",
+    termsIntro:"Tafadhali soma masharti haya kwa makini kabla ya kutumia Quietly Here. Kwa kuunda akaunti au kutumia jukwaa, unakubali kufungwa nayo. Usipokubali, tafadhali usitumie huduma hii.",
+    t1h:"1. Kuhusu Quietly Here", t1b:"Quietly Here ni jukwaa la kusoma na kushiriki hadithi za binafsi. Si mbadala wa ushauri wa kitaalamu wa matibabu, kisheria, kifedha, au afya ya akili. Ukiwa kwenye hatari, wasiliana na nambari za msaada kwenye ukurasa wa Pata Msaada au huduma za dharura mara moja.",
+    t2h:"2. Sifa na akaunti", t2b:"Lazima uwe na miaka 18 au zaidi, au uwe na ridhaa ya mzazi au mlezi, kutumia Quietly Here. Lazima utoe barua pepe halali na kuithibitisha kabla ya kuhifadhi hadithi, kutuma maandishi, au kuripoti maudhui. Unawajibika kuweka nenosiri lako siri na kwa shughuli zote kwenye akaunti yako. Tujulishe mara moja ukiamini akaunti yako imeathirika.",
+    t3h:"3. Maudhui yako na leseni unayotoa", t3b:"Unabaki na umiliki wa unachoandika. Kwa kutuma hadithi au maoni, unampa Quietly Here leseni isiyo ya kipekee, ya kimataifa, bila malipo ya kuchapisha, kuonyesha, kuhariri kidogo, na kutafsiri, na kuitumia kuendesha na kutangaza jukwaa. Unathibitisha kwamba maudhui yako hayakiuki masharti haya wala haki za mtu mwingine.",
+    t4h:"4. Maudhui yaliyopigwa marufuku", t4b:"Usichapishe chochote kilicho kinyume cha sheria, cha kukashifu, chuki, unyanyasaji, vitisho, uchafu, au kingono; kinachohamasisha kujiumiza, kujiua, vurugu, au shughuli haramu; kinachokiuka hakimiliki au faragha ya mtu mwingine; au chenye spam, ulaghai, au matangazo. Tafadhali soma Sheria za Jumuiya kwenye ukurasa wa Pata Msaada.",
+    t5h:"5. Usimamizi na uondoaji", t5b:"Kila hadithi hukaguliwa kabla ya kuchapishwa. Tunaweza kuhariri, kukataa, kuficha, au kuondoa maudhui yoyote, na kusimamisha au kuzuia watumiaji — kwa jina, kifaa, au anwani ya IP — tunapoona ni muhimu kulinda jumuiya. Tunaripoti maudhui kwa mamlaka pale sheria inapotaka. Kutumia vibaya mfumo wa kuripoti pia ni ukiukaji wa masharti haya.",
+    t6h:"6. Faragha na data yako", t6b:"Tunakusanya tu tunachohitaji kuendesha huduma: jina lako na barua pepe (kwa akaunti), maudhui unayochapisha, na data ndogo ya kiufundi (kitambulisho cha kifaa na anwani ya IP) inayotumika kuzuia spam na unyanyasaji. Hatuuzii data yako, wala hatuishiriki na watu wengine isipokuwa watoa huduma wetu wa barua pepe na upangishaji inapohitajika kuendesha huduma. Unaweza kuomba kufutwa kwa data yako wakati wowote kupitia ukurasa wa Wasiliana.",
+    t7h:"7. Kanusho na kikomo cha dhima", t7b:"Quietly Here hutolewa \"kama ilivyo\" na \"inapopatikana\", bila dhamana ya aina yoyote. Kwa kiwango kamili kinachoruhusiwa na sheria, hatuwajibiki kwa hasara yoyote isiyo ya moja kwa moja, ya bahati mbaya, au ya kufuatia kutokana na matumizi yako ya jukwaa, ikijumuisha kutegemea maudhui yaliyochapishwa na watumiaji wengine. Hadithi zinaonyesha maoni ya waandishi wao, si yetu.",
+    t8h:"8. Mabadiliko ya masharti haya", t8b:"Tunaweza kusasisha masharti haya mara kwa mara. Tutachapisha toleo jipya na tarehe iliyosasishwa. Kuendelea kwako kutumia jukwaa baada ya mabadiliko yoyote kunamaanisha unakubali masharti yaliyorekebishwa. Usipokubali, unapaswa kuacha kutumia huduma.",
+    t9h:"9. Wasiliana nasi", t9b:"Maswali au wasiwasi kuhusu masharti haya, au maombi ya kufuta data yako, yanaweza kutumwa kupitia ukurasa wa Wasiliana.",
     agreeTerms:"Nimesoma na ninakubali", agreeTermsLink:"Masharti & Faragha",
     mustAgree:"Tafadhali kubali Masharti & Faragha ili kuunda akaunti.",
     readTerms:"Soma Masharti & Faragha",
@@ -709,7 +715,7 @@ function renderLibrary() {
 function renderHelp() {
   const lines = HELPLINES.map(h => `<div class="hline"><div><div class="num">${h.n}</div><div class="svc">${h.svc}</div></div>
     <a class="call" href="tel:${h.tel}" title="Call">📞</a></div>`).join("");
-  const rules = [1,2,3,4,5].map(i => `<li>${tt("r"+i)}</li>`).join("");
+  const rules = [1,2,3,4,5,6,7,8].map(i => `<li>${tt("r"+i)}</li>`).join("");
   scrollEl().innerHTML = `<div class="view" style="padding-bottom:60px">
     <div class="backbar"><button class="back" data-action="back">←</button><div class="backtitle">${tt("helpTitle")}</div></div>
     <div class="helpblock"><h4>🤫 ${tt("hMission")}</h4><p>${tt("hMissionB")}</p></div>
@@ -783,6 +789,9 @@ function renderTerms() {
       ${sec("t4h","t4b")}
       ${sec("t5h","t5b")}
       ${sec("t6h","t6b")}
+      ${sec("t7h","t7b")}
+      ${sec("t8h","t8b")}
+      ${sec("t9h","t9b")}
     </div>
   </div>`;
 }
